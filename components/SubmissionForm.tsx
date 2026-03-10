@@ -19,6 +19,8 @@ interface Profile {
   name: string;
 }
 
+type FormState = "landing" | "uploading" | "editing" | "sucking" | "profile";
+
 export default function SubmissionForm({
   onSubmitted,
   droppedFile,
@@ -35,11 +37,9 @@ export default function SubmissionForm({
   const [keywords, setKeywords] = useState<string[]>([]);
   const [thought, setThought] = useState("");
   const [filePath, setFilePath] = useState<string | null>(null);
-  const [fileName, setFileName] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [successMsg, setSuccessMsg] = useState(false);
-  const [showDetails, setShowDetails] = useState(false);
+  const [formState, setFormState] = useState<FormState>("landing");
+  const [showThought, setShowThought] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -66,7 +66,7 @@ export default function SubmissionForm({
 
   const uploadAndExtract = useCallback(async (file: File) => {
     if (!file.name.toLowerCase().endsWith(".pdf")) return;
-    setUploading(true);
+    setFormState("uploading");
 
     try {
       const storagePath = `${Date.now()}-${file.name}`;
@@ -76,11 +76,11 @@ export default function SubmissionForm({
 
       if (uploadError) {
         console.error("Storage upload failed:", uploadError);
+        setFormState("landing");
         return;
       }
 
       setFilePath(storagePath);
-      setFileName(file.name);
 
       const res = await fetch("/api/upload", {
         method: "POST",
@@ -94,10 +94,10 @@ export default function SubmissionForm({
         if (data.abstract) setAbstract(data.abstract);
         if (data.keywords) setKeywords(data.keywords);
       }
+      setFormState("editing");
     } catch (err) {
       console.error("Upload failed:", err);
-    } finally {
-      setUploading(false);
+      setFormState("landing");
     }
   }, []);
 
@@ -115,12 +115,12 @@ export default function SubmissionForm({
 
   const clearAll = () => {
     setFilePath(null);
-    setFileName(null);
     setTitle("");
     setAbstract("");
     setKeywords([]);
     setThought("");
-    setShowDetails(false);
+    setShowThought(false);
+    setFormState("landing");
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -130,6 +130,10 @@ export default function SubmissionForm({
     if (!abstract.trim() && !thought.trim()) return;
 
     setSubmitting(true);
+    setFormState("sucking");
+
+    // Wait for animation
+    await new Promise((r) => setTimeout(r, 600));
 
     try {
       const submissions: Array<{
@@ -140,7 +144,6 @@ export default function SubmissionForm({
         file_path: string | null;
       }> = [];
 
-      // Paper submission (from PDF)
       if (abstract.trim()) {
         let paperBody = abstract.trim();
         if (keywords.length > 0) {
@@ -155,7 +158,6 @@ export default function SubmissionForm({
         });
       }
 
-      // Thought submission (optional)
       if (thought.trim()) {
         submissions.push({
           profile_id: selectedProfileId,
@@ -166,7 +168,6 @@ export default function SubmissionForm({
         });
       }
 
-      // Submit all
       for (const sub of submissions) {
         await fetch("/api/submissions", {
           method: "POST",
@@ -176,154 +177,137 @@ export default function SubmissionForm({
       }
 
       clearAll();
-      setSuccessMsg(true);
-      setTimeout(() => setSuccessMsg(false), 3000);
       onSubmitted();
     } catch (err) {
       console.error("Submission failed:", err);
+      setFormState("editing");
     } finally {
       setSubmitting(false);
     }
   };
 
+  // Hidden file input (always present)
+  const fileInput = (
+    <input
+      ref={fileInputRef}
+      type="file"
+      accept=".pdf"
+      onChange={handleFileInput}
+      style={{ display: "none" }}
+    />
+  );
+
+  // Profile selection
   if (!selectedProfileId) {
     return (
-      <div className="submission-form-wrapper">
-        <label className="form-label">Your name</label>
-        <select
-          value={selectedProfileId}
-          onChange={(e) => handleProfileChange(e.target.value)}
-          className="form-select"
-        >
-          <option value="">Select your name...</option>
-          {profiles.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
+      <div className="center-form">
+        {fileInput}
+        <div className="profile-select-box">
+          <label className="form-label" style={{ color: "#888", marginBottom: "8px" }}>
+            Who are you?
+          </label>
+          <select
+            value={selectedProfileId}
+            onChange={(e) => handleProfileChange(e.target.value)}
+            className="form-select"
+          >
+            <option value="">Select your name...</option>
+            {profiles.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
     );
   }
 
-  return (
-    <div className="submission-form-wrapper">
-      {/* Hidden file input */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".pdf"
-        onChange={handleFileInput}
-        style={{ display: "none" }}
-      />
-
-      {/* Upload status */}
-      {uploading && (
-        <div className="upload-status">
-          Uploading &amp; extracting metadata...
-        </div>
-      )}
-
-      {/* Compact paper card (after upload) */}
-      {fileName && !uploading && (
-        <div className="paper-card">
-          <div className="paper-card-header">
-            <div className="paper-card-info">
-              <span className="paper-card-title">{title || fileName}</span>
-              {keywords.length > 0 && (
-                <div className="keywords-row" style={{ marginTop: "8px", marginBottom: 0 }}>
-                  {keywords.map((kw, i) => (
-                    <span key={i} className="keyword-tag">{kw}</span>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="paper-card-actions">
-              <button
-                type="button"
-                onClick={() => setShowDetails(!showDetails)}
-                className="paper-card-toggle"
-              >
-                {showDetails ? "hide details" : "show details"}
-              </button>
-              <button type="button" onClick={clearAll} className="file-banner-clear">
-                remove
-              </button>
-            </div>
-          </div>
-
-          {/* Expandable details */}
-          {showDetails && (
-            <div className="paper-card-details">
-              <div style={{ marginBottom: "12px" }}>
-                <label className="form-label">Title</label>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="form-input"
-                />
-              </div>
-              <div>
-                <label className="form-label">Abstract</label>
-                <textarea
-                  value={abstract}
-                  onChange={(e) => setAbstract(e.target.value)}
-                  className="form-textarea"
-                  rows={6}
-                />
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Drop hint + browse (before upload) */}
-      {!filePath && !uploading && (
-        <div className="pdf-drop-hint">
-          <p className="pdf-drop-hint-text">
-            Drag &amp; drop a PDF anywhere on this page
-          </p>
+  // Landing state: just the drop zone
+  if (formState === "landing") {
+    return (
+      <div className="center-form">
+        {fileInput}
+        <div className="drop-zone">
+          <div className="drop-zone-ring" />
+          <p className="drop-zone-text">Drop a PDF</p>
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="browse-link"
+            className="drop-zone-browse"
           >
-            or browse for a PDF
+            or browse
           </button>
         </div>
-      )}
+      </div>
+    );
+  }
 
-      <form onSubmit={handleSubmit}>
-        {/* Single thought field */}
-        <div style={{ marginBottom: "20px" }}>
-          <label className="form-label">Add a thought (optional)</label>
-          <textarea
-            value={thought}
-            onChange={(e) => setThought(e.target.value)}
-            placeholder="Why is this interesting? Did it spark an idea?"
-            className="form-textarea"
-            rows={3}
-          />
+  // Uploading state: spinner
+  if (formState === "uploading") {
+    return (
+      <div className="center-form">
+        {fileInput}
+        <div className="upload-spinner-container">
+          <div className="upload-spinner" />
+          <p className="upload-spinner-text">Extracting...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Editing / Sucking state: paper card + thought + submit
+  return (
+    <div className="center-form">
+      {fileInput}
+      <div className={`edit-card${formState === "sucking" ? " edit-card-sucking" : ""}`}>
+        {/* Paper info */}
+        <div className="edit-card-paper">
+          <h3 className="edit-card-title">{title || "Untitled"}</h3>
+          {keywords.length > 0 && (
+            <div className="edit-card-keywords">
+              {keywords.map((kw, i) => (
+                <span key={i} className="keyword-tag">{kw}</span>
+              ))}
+            </div>
+          )}
+          <button type="button" onClick={clearAll} className="edit-card-remove">
+            remove
+          </button>
         </div>
 
-        {/* Submit */}
-        <button
-          type="submit"
-          disabled={
-            submitting ||
-            uploading ||
-            (!abstract.trim() && !thought.trim())
-          }
-          className="submit-btn"
-        >
-          {submitting ? "Dropping..." : "Drop it in"}
-        </button>
+        {/* Thought toggle */}
+        <form onSubmit={handleSubmit}>
+          {!showThought ? (
+            <button
+              type="button"
+              onClick={() => setShowThought(true)}
+              className="thought-toggle"
+            >
+              + add a thought
+            </button>
+          ) : (
+            <div className="thought-area">
+              <textarea
+                value={thought}
+                onChange={(e) => setThought(e.target.value)}
+                placeholder="Why is this interesting? Any ideas?"
+                className="thought-input"
+                rows={3}
+                autoFocus
+              />
+            </div>
+          )}
 
-        {successMsg && (
-          <p className="success-msg">Added to the funnel &#10003;</p>
-        )}
-      </form>
+          <button
+            type="submit"
+            disabled={submitting || (!abstract.trim() && !thought.trim())}
+            className="submit-btn"
+          >
+            {submitting ? "..." : "Drop it in"}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

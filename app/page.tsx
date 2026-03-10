@@ -11,13 +11,12 @@ export default function Home() {
   const [selectedName, setSelectedName] = useState<string>("");
   const [droppedFile, setDroppedFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
+
   useEffect(() => {
     const name = localStorage.getItem("funnel_profile_name");
     if (name) setSelectedName(name);
   }, []);
 
-  // All drag/drop on document level — must preventDefault on dragover
-  // for drop to fire, and use capture phase to beat the browser default
   useEffect(() => {
     const handleDragOver = (e: DragEvent) => {
       e.preventDefault();
@@ -36,7 +35,6 @@ export default function Home() {
     };
 
     const handleDragLeave = (e: DragEvent) => {
-      // Only hide overlay when leaving the document entirely
       if (e.relatedTarget === null) {
         setDragOver(false);
       }
@@ -70,8 +68,8 @@ export default function Home() {
   }, []);
 
   return (
-    <div style={{ minHeight: "100vh", position: "relative" }}>
-      {/* Background shader — very subtle */}
+    <div className="page-root">
+      {/* Background shader */}
       <PrismaticBurst
         intensity={2.3}
         speed={0.15}
@@ -79,7 +77,7 @@ export default function Home() {
         colors={["#a03131", "#60a99d", "#566c04"]}
       />
 
-      {/* Full-page drag overlay */}
+      {/* Drag overlay */}
       {dragOver && (
         <div className="drag-overlay">
           <div className="drag-overlay-content">
@@ -88,41 +86,33 @@ export default function Home() {
         </div>
       )}
 
-      {/* Status bar — full width */}
-      <div style={{ position: "relative", zIndex: 1 }}>
-      <FunnelStatus />
+      {/* UI layer */}
+      <div className="ui-layer">
+        {/* Status bar */}
+        <FunnelStatus />
 
-      {/* Content — centered column */}
-      <div
-        style={{
-          maxWidth: "640px",
-          margin: "0 auto",
-          padding: "0 24px 64px",
-        }}
-      >
-        {/* Header */}
-        <div className="header">
-          <span className="header-title">Twin Agent Incubator</span>
-          {selectedName && (
-            <span className="header-user">
-              {selectedName}
-              <button onClick={handleChangeName}>change</button>
-            </span>
-          )}
+        {/* Top-left: user info + submissions */}
+        <div className="corner-panel">
+          <div className="corner-header">
+            <span className="corner-title">Twin Agent Incubator</span>
+            {selectedName && (
+              <span className="corner-user">
+                {selectedName}
+                <button onClick={handleChangeName}>change</button>
+              </span>
+            )}
+          </div>
+          <SubmissionList refreshKey={refreshKey} />
         </div>
 
-        {/* Submission Form */}
-        <div style={{ marginBottom: "40px" }}>
+        {/* Center stage: the drop zone / form */}
+        <div className="center-stage">
           <SubmissionForm
             onSubmitted={handleSubmitted}
             droppedFile={droppedFile}
             onFileConsumed={handleFileConsumed}
           />
         </div>
-
-        {/* User's Submissions */}
-        <SubmissionList refreshKey={refreshKey} />
-      </div>
       </div>
     </div>
   );

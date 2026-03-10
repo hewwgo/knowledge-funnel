@@ -10,136 +10,349 @@
 
 body {
   background: #000000;
-  color: #262624;
+  color: #ffffff;
   font-family: "Inter", sans-serif;
   font-weight: 400;
   -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  height: 100vh;
+}
+
+/* === Page Layout === */
+
+.page-root {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.ui-layer {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 /* === Funnel Status Bar === */
 
 .funnel-status {
-  background: #262624;
-  padding: 16px 24px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  padding: 12px 24px;
   width: 100%;
+  flex-shrink: 0;
 }
 
-/* === Submission Form === */
+/* === Corner Panel (top-left) === */
 
-.submission-form-wrapper {
-  border: 1.5px solid #d4a574;
-  background: #fff4eb;
-  padding: 32px;
+.corner-panel {
+  position: absolute;
+  top: 60px;
+  left: 24px;
+  max-width: 340px;
+  z-index: 2;
 }
 
-.form-label {
-  display: block;
-  font-size: 12px;
+.corner-header {
+  margin-bottom: 16px;
+}
+
+.corner-title {
+  font-size: 13px;
   font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #888888;
-  margin-bottom: 6px;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.corner-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+  margin-top: 4px;
+}
+
+.corner-user button {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  font-size: 11px;
+  font-family: "Inter", sans-serif;
+  text-decoration: underline;
+  padding: 0;
+}
+
+.corner-user button:hover {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* === Center Stage === */
+
+.center-stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.center-form {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* === Profile Select === */
+
+.profile-select-box {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 32px;
+  min-width: 300px;
+}
+
+.profile-select-box .form-label {
+  color: rgba(255, 255, 255, 0.5);
 }
 
 .form-select {
   width: 100%;
   padding: 10px 12px;
-  border: 1.5px solid #262624;
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 0;
-  background: #ffffff;
+  background: rgba(0, 0, 0, 0.4);
   font-size: 14px;
   font-family: "Inter", sans-serif;
-  color: #262624;
+  color: #ffffff;
   appearance: auto;
 }
 
-.form-input {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1.5px solid #262624;
-  border-radius: 0;
-  background: #ffffff;
-  font-size: 14px;
-  font-family: "Inter", sans-serif;
-  color: #262624;
+.form-select:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.4);
 }
 
-.form-textarea {
+/* === Drop Zone === */
+
+.drop-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  cursor: default;
+}
+
+.drop-zone-ring {
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  transition: border-color 0.3s, transform 0.3s;
+}
+
+.drop-zone:hover .drop-zone-ring {
+  border-color: rgba(255, 255, 255, 0.4);
+  transform: scale(1.05);
+}
+
+.drop-zone-text {
+  font-size: 16px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.6);
+  letter-spacing: 0.02em;
+}
+
+.drop-zone-browse {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  font-size: 13px;
+  font-family: "Inter", sans-serif;
+  text-decoration: underline;
+  padding: 0;
+}
+
+.drop-zone-browse:hover {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* === Upload Spinner === */
+
+.upload-spinner-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.upload-spinner {
+  width: 48px;
+  height: 48px;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-top-color: rgba(255, 255, 255, 0.6);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.upload-spinner-text {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* === Edit Card === */
+
+.edit-card {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 28px;
+  min-width: 380px;
+  max-width: 480px;
+  transition: transform 0.6s cubic-bezier(0.55, 0.06, 0.68, 0.19),
+              opacity 0.6s cubic-bezier(0.55, 0.06, 0.68, 0.19);
+}
+
+.edit-card-sucking {
+  transform: scale(0) rotate(10deg);
+  opacity: 0;
+}
+
+.edit-card-paper {
+  margin-bottom: 20px;
+  position: relative;
+}
+
+.edit-card-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: #ffffff;
+  line-height: 1.4;
+  margin-bottom: 10px;
+}
+
+.edit-card-keywords {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.edit-card-remove {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  font-size: 11px;
+  font-family: "Inter", sans-serif;
+  text-decoration: underline;
+  padding: 0;
+  margin-top: 8px;
+}
+
+.edit-card-remove:hover {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* === Thought === */
+
+.thought-toggle {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  font-size: 13px;
+  font-family: "Inter", sans-serif;
+  padding: 0;
+  margin-bottom: 16px;
+  display: block;
+}
+
+.thought-toggle:hover {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.thought-area {
+  margin-bottom: 16px;
+}
+
+.thought-input {
   width: 100%;
   padding: 10px 12px;
-  border: 1.5px solid #262624;
+  border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 0;
-  background: #ffffff;
+  background: rgba(0, 0, 0, 0.3);
   font-size: 14px;
   font-family: "Inter", sans-serif;
-  color: #262624;
+  color: #ffffff;
   resize: vertical;
 }
 
-.form-file {
-  font-size: 13px;
-  font-family: "Inter", sans-serif;
-  color: #262624;
+.thought-input::placeholder {
+  color: rgba(255, 255, 255, 0.3);
 }
 
-.form-input::placeholder,
-.form-textarea::placeholder {
-  color: #888888;
-}
-
-.form-input:focus,
-.form-textarea:focus,
-.form-select:focus {
+.thought-input:focus {
   outline: none;
-  border-color: #c07830;
+  border-color: rgba(255, 255, 255, 0.3);
 }
 
-/* === Type Selector === */
+/* === Keywords === */
 
-.type-selector {
-  display: flex;
-  gap: 0;
+.keyword-tag {
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 3px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.5);
+  background: transparent;
 }
 
-.type-btn {
-  flex: 1;
-  padding: 10px 16px;
-  border: 1.5px solid #262624;
-  background: #ffffff;
-  color: #262624;
+/* === Submit Button === */
+
+.submit-btn {
+  width: 100%;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 0;
   font-size: 14px;
   font-weight: 500;
   font-family: "Inter", sans-serif;
   cursor: pointer;
-  border-radius: 0;
   transition: background 0.15s, color 0.15s;
 }
 
-.type-btn + .type-btn {
-  border-left: 0;
-}
-
-.type-btn:hover {
-  background: #f5f5f5;
-}
-
-.type-btn-active {
-  background: #262624;
+.submit-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
   color: #ffffff;
 }
 
-.type-btn-active:hover {
-  background: #262624;
+.submit-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
 }
 
-/* === Full-page drag overlay === */
+/* === Drag Overlay === */
 
 .drag-overlay {
   position: fixed;
   inset: 0;
   z-index: 9999;
-  background: rgba(255, 244, 235, 0.92);
+  background: rgba(0, 0, 0, 0.8);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -147,199 +360,35 @@ body {
 }
 
 .drag-overlay-content {
-  border: 2.5px dashed #c07830;
+  border: 2px dashed rgba(255, 255, 255, 0.3);
   padding: 60px 80px;
 }
 
 .drag-overlay-text {
   font-size: 22px;
-  font-weight: 500;
-  color: #262624;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.6);
 }
 
-/* === Upload status / file banner === */
-
-.upload-status {
-  text-align: center;
-  padding: 16px;
-  margin-bottom: 20px;
-  font-size: 14px;
-  font-weight: 500;
-  color: #c07830;
-  background: #ffffff;
-  border: 1.5px solid #d4a574;
-}
-
-/* === Compact paper card === */
-
-.paper-card {
-  background: #ffffff;
-  border: 1.5px solid #262624;
-  padding: 16px;
-  margin-bottom: 20px;
-}
-
-.paper-card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
-}
-
-.paper-card-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.paper-card-title {
-  font-size: 15px;
-  font-weight: 500;
-  color: #262624;
-  line-height: 1.4;
-}
-
-.paper-card-actions {
-  display: flex;
-  gap: 12px;
-  flex-shrink: 0;
-  align-items: center;
-}
-
-.paper-card-toggle {
-  background: none;
-  border: none;
-  color: #888888;
-  cursor: pointer;
-  font-size: 12px;
-  font-family: "Inter", sans-serif;
-  text-decoration: underline;
-  padding: 0;
-}
-
-.paper-card-toggle:hover {
-  color: #262624;
-}
-
-.paper-card-details {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid #eee;
-}
-
-.file-banner-clear {
-  background: none;
-  border: none;
-  color: #c07830;
-  cursor: pointer;
-  font-size: 12px;
-  font-family: "Inter", sans-serif;
-  text-decoration: underline;
-  padding: 0;
-}
-
-/* === Keywords === */
-
-.keywords-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 20px;
-}
-
-.keyword-tag {
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  padding: 4px 10px;
-  border: 1.5px solid #d4a574;
-  color: #c07830;
-  background: #ffffff;
-}
-
-/* === PDF drop hint === */
-
-.pdf-drop-hint {
-  text-align: center;
-  padding: 20px;
-  margin-bottom: 24px;
-  border: 1.5px dashed #d4a574;
-  background: #ffffff;
-}
-
-.pdf-drop-hint-text {
-  font-size: 14px;
-  color: #888888;
-  margin-bottom: 6px;
-}
-
-/* === Browse link === */
-
-.browse-link {
-  background: none;
-  border: none;
-  color: #888888;
-  cursor: pointer;
-  font-size: 13px;
-  font-family: "Inter", sans-serif;
-  text-decoration: underline;
-  padding: 0;
-}
-
-/* === Submit Button === */
-
-.submit-btn {
-  width: 100%;
-  padding: 14px;
-  background: #262624;
-  color: #ffffff;
-  border: none;
-  border-radius: 0;
-  font-size: 15px;
-  font-weight: 500;
-  font-family: "Inter", sans-serif;
-  cursor: pointer;
-  transition: opacity 0.15s;
-}
-
-.submit-btn:hover {
-  opacity: 0.9;
-}
-
-.submit-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* === Success Message === */
-
-.success-msg {
-  margin-top: 12px;
-  text-align: center;
-  font-size: 14px;
-  font-weight: 500;
-  color: #c07830;
-}
-
-/* === Submissions List === */
+/* === Submissions List (corner) === */
 
 .submissions-list {
   padding: 0;
 }
 
 .section-title {
-  font-size: 14px;
+  font-size: 11px;
   font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #888888;
-  margin-bottom: 16px;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.3);
+  margin-bottom: 10px;
 }
 
 .muted-text {
-  font-size: 14px;
-  color: #888888;
-  line-height: 1.6;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.25);
+  line-height: 1.5;
 }
 
 .submission-items {
@@ -348,35 +397,36 @@ body {
 
 .submission-group {
   padding: 0;
-  margin-bottom: 4px;
-  border-bottom: 1px solid #eee;
+  margin-bottom: 2px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .submission-item {
   display: flex;
   align-items: baseline;
-  gap: 12px;
-  padding: 10px 0;
-  font-size: 14px;
+  gap: 8px;
+  padding: 6px 0;
+  font-size: 12px;
 }
 
 .submission-paper {
-  padding: 12px 0;
+  padding: 8px 0;
 }
 
 .submission-paper-title {
   font-weight: 500;
   white-space: normal;
-  line-height: 1.4;
+  line-height: 1.3;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .submission-child {
-  padding: 6px 0 6px 60px;
+  padding: 4px 0 4px 44px;
 }
 
 .submission-child .submission-text {
-  font-size: 13px;
-  color: #666666;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.3);
 }
 
 .submission-expandable {
@@ -384,12 +434,12 @@ body {
 }
 
 .submission-expandable:hover .submission-text {
-  color: #262624;
+  color: rgba(255, 255, 255, 0.6);
 }
 
 .submission-text-expanded {
   white-space: normal;
-  line-height: 1.5;
+  line-height: 1.4;
   overflow: visible;
   text-overflow: unset;
 }
@@ -399,18 +449,18 @@ body {
 }
 
 .submission-type {
-  font-size: 11px;
+  font-size: 9px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #c07830;
+  color: rgba(255, 255, 255, 0.25);
   flex-shrink: 0;
-  width: 48px;
+  width: 44px;
 }
 
 .submission-text {
   flex: 1;
-  color: #262624;
+  color: rgba(255, 255, 255, 0.5);
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -418,44 +468,53 @@ body {
 }
 
 .submission-time {
-  font-size: 12px;
-  color: #888888;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.2);
   flex-shrink: 0;
 }
 
-/* === Header === */
+/* === Form helpers (kept for profile select) === */
 
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px 0;
-  border-bottom: 1.5px solid #262624;
-  margin-bottom: 32px;
-}
-
-.header-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #262624;
-  letter-spacing: -0.01em;
-}
-
-.header-user {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: #888888;
-}
-
-.header-user button {
-  background: none;
-  border: none;
-  color: #c07830;
-  cursor: pointer;
+.form-label {
+  display: block;
   font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+
+.form-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 0;
+  background: rgba(0, 0, 0, 0.4);
+  font-size: 14px;
   font-family: "Inter", sans-serif;
-  text-decoration: underline;
-  padding: 0;
+  color: #ffffff;
+}
+
+.form-textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 0;
+  background: rgba(0, 0, 0, 0.4);
+  font-size: 14px;
+  font-family: "Inter", sans-serif;
+  color: #ffffff;
+  resize: vertical;
+}
+
+.form-input::placeholder,
+.form-textarea::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.form-input:focus,
+.form-textarea:focus,
+.form-select:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.4);
 }
