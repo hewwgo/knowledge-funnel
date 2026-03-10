@@ -33,13 +33,13 @@ export default function SubmissionForm({
   const [title, setTitle] = useState("");
   const [abstract, setAbstract] = useState("");
   const [keywords, setKeywords] = useState<string[]>([]);
-  const [note, setNote] = useState("");
-  const [idea, setIdea] = useState("");
+  const [thought, setThought] = useState("");
   const [filePath, setFilePath] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [successMsg, setSuccessMsg] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -119,16 +119,15 @@ export default function SubmissionForm({
     setTitle("");
     setAbstract("");
     setKeywords([]);
-    setNote("");
-    setIdea("");
+    setThought("");
+    setShowDetails(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedProfileId) return;
-    // Need at least an abstract (from PDF) or a note or an idea
-    if (!abstract.trim() && !note.trim() && !idea.trim()) return;
+    if (!abstract.trim() && !thought.trim()) return;
 
     setSubmitting(true);
 
@@ -156,24 +155,13 @@ export default function SubmissionForm({
         });
       }
 
-      // Note submission (optional)
-      if (note.trim()) {
+      // Thought submission (optional)
+      if (thought.trim()) {
         submissions.push({
           profile_id: selectedProfileId,
-          content_type: "note",
-          title: title.trim() ? `Note on: ${title.trim()}` : null,
-          body: note.trim(),
-          file_path: null,
-        });
-      }
-
-      // Idea submission (optional)
-      if (idea.trim()) {
-        submissions.push({
-          profile_id: selectedProfileId,
-          content_type: "idea",
-          title: title.trim() ? `Idea from: ${title.trim()}` : null,
-          body: idea.trim(),
+          content_type: "thought",
+          title: title.trim() ? `On: ${title.trim()}` : null,
+          body: thought.trim(),
           file_path: null,
         });
       }
@@ -236,13 +224,57 @@ export default function SubmissionForm({
         </div>
       )}
 
-      {/* File banner (after upload) */}
+      {/* Compact paper card (after upload) */}
       {fileName && !uploading && (
-        <div className="file-banner">
-          <span className="file-banner-name">{fileName}</span>
-          <button type="button" onClick={clearAll} className="file-banner-clear">
-            remove
-          </button>
+        <div className="paper-card">
+          <div className="paper-card-header">
+            <div className="paper-card-info">
+              <span className="paper-card-title">{title || fileName}</span>
+              {keywords.length > 0 && (
+                <div className="keywords-row" style={{ marginTop: "8px", marginBottom: 0 }}>
+                  {keywords.map((kw, i) => (
+                    <span key={i} className="keyword-tag">{kw}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="paper-card-actions">
+              <button
+                type="button"
+                onClick={() => setShowDetails(!showDetails)}
+                className="paper-card-toggle"
+              >
+                {showDetails ? "hide details" : "show details"}
+              </button>
+              <button type="button" onClick={clearAll} className="file-banner-clear">
+                remove
+              </button>
+            </div>
+          </div>
+
+          {/* Expandable details */}
+          {showDetails && (
+            <div className="paper-card-details">
+              <div style={{ marginBottom: "12px" }}>
+                <label className="form-label">Title</label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="form-input"
+                />
+              </div>
+              <div>
+                <label className="form-label">Abstract</label>
+                <textarea
+                  value={abstract}
+                  onChange={(e) => setAbstract(e.target.value)}
+                  className="form-textarea"
+                  rows={6}
+                />
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -262,63 +294,16 @@ export default function SubmissionForm({
         </div>
       )}
 
-      {/* Keywords */}
-      {keywords.length > 0 && !uploading && (
-        <div className="keywords-row">
-          {keywords.map((kw, i) => (
-            <span key={i} className="keyword-tag">
-              {kw}
-            </span>
-          ))}
-        </div>
-      )}
-
       <form onSubmit={handleSubmit}>
-        {/* Title */}
+        {/* Single thought field */}
         <div style={{ marginBottom: "20px" }}>
-          <label className="form-label">Title</label>
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Paper title (auto-filled from PDF)"
-            className="form-input"
-          />
-        </div>
-
-        {/* Abstract */}
-        <div style={{ marginBottom: "20px" }}>
-          <label className="form-label">Abstract</label>
+          <label className="form-label">Add a thought (optional)</label>
           <textarea
-            value={abstract}
-            onChange={(e) => setAbstract(e.target.value)}
-            placeholder="Paste an abstract here, or drop a PDF above"
+            value={thought}
+            onChange={(e) => setThought(e.target.value)}
+            placeholder="Why is this interesting? Did it spark an idea?"
             className="form-textarea"
-            rows={filePath ? 6 : 3}
-          />
-        </div>
-
-        {/* Note */}
-        <div style={{ marginBottom: "20px" }}>
-          <label className="form-label">Note</label>
-          <textarea
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Any thoughts on this paper? Why is it interesting?"
-            className="form-textarea"
-            rows={2}
-          />
-        </div>
-
-        {/* Idea */}
-        <div style={{ marginBottom: "20px" }}>
-          <label className="form-label">Idea</label>
-          <textarea
-            value={idea}
-            onChange={(e) => setIdea(e.target.value)}
-            placeholder="Did this paper spark a research idea? A rough idea is fine"
-            className="form-textarea"
-            rows={2}
+            rows={3}
           />
         </div>
 
@@ -328,7 +313,7 @@ export default function SubmissionForm({
           disabled={
             submitting ||
             uploading ||
-            (!abstract.trim() && !note.trim() && !idea.trim())
+            (!abstract.trim() && !thought.trim())
           }
           className="submit-btn"
         >

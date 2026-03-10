@@ -141,7 +141,11 @@ export default function SubmissionList({
                     onClick={() => isLong && toggleExpand(child.id)}
                   >
                     <span className="submission-type">
-                      {child.content_type === "idea" ? "Idea" : "Note"}
+                      {child.content_type === "thought"
+                        ? "Thought"
+                        : child.content_type === "idea"
+                          ? "Idea"
+                          : "Note"}
                     </span>
                     <span className={`submission-text${isExpanded ? " submission-text-expanded" : ""}`}>
                       {isExpanded ? child.body : child.body.slice(0, 80)}
