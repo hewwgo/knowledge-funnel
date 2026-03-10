@@ -9,9 +9,10 @@ export default function VoidFunnel() {
         zIndex: 0,
         pointerEvents: "none",
         backgroundImage: "url(/wormhole.jpg)",
-        backgroundSize: "cover",
-        backgroundPosition: "center",
+        backgroundSize: "85%",
+        backgroundPosition: "center 48%",
         backgroundRepeat: "no-repeat",
+        backgroundColor: "#ebebeb",
       }}
     />
   );
