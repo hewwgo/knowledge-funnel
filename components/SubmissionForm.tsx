@@ -229,7 +229,6 @@ export default function SubmissionForm({
       <div className="center-form">
         {fileInput}
         <div className="drop-zone">
-          <div className="drop-zone-ring" />
           <p className="drop-zone-text">Drop a PDF</p>
           <button
             type="button"

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import FunnelStatus from "@/components/FunnelStatus";
 import SubmissionForm from "@/components/SubmissionForm";
 import SubmissionList from "@/components/SubmissionList";
+import VoidFunnel from "@/components/VoidFunnel";
 
 export default function Home() {
   const [refreshKey, setRefreshKey] = useState(0);
@@ -67,18 +68,9 @@ export default function Home() {
   }, []);
 
   return (
-    <div className={`page-root${dragOver ? " page-dragging" : ""}`}>
-      {/* Void background — radial gradient + noise */}
-      <div className="void-bg" />
-      <div className="void-noise" />
-
-      {/* Gravity rings */}
-      <div className="void-rings">
-        <div className="void-ring void-ring-1" />
-        <div className="void-ring void-ring-2" />
-        <div className="void-ring void-ring-3" />
-        <div className="void-ring void-ring-4" />
-      </div>
+    <div className="page-root">
+      {/* Wireframe funnel canvas */}
+      <VoidFunnel dragging={dragOver} />
 
       {/* Drag overlay */}
       {dragOver && (

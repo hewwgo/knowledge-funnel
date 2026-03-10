@@ -12,7 +12,11 @@
       "Bash(npm ls pdf-parse)",
       "Bash(node -e \"const m = require\\(''pdf-parse''\\); console.log\\(typeof m\\)\")",
       "Bash(npm uninstall pdf-parse)",
-      "Bash(npm install unpdf)"
+      "Bash(npm install unpdf)",
+      "WebSearch",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(rm components/PrismaticBurst.tsx)",
+      "Bash(npm uninstall ogl)"
     ]
   }
 }

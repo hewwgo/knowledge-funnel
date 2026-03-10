@@ -9,7 +9,7 @@
 }
 
 body {
-  background: #ffffff;
+  background: #ebebeb;
   color: #262624;
   font-family: "Inter", sans-serif;
   font-weight: 400;
@@ -36,144 +36,10 @@ body {
   flex-direction: column;
 }
 
-/* === Void Background === */
-
-.void-bg {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  background:
-    /* Dark core — the "hole" */
-    radial-gradient(
-      circle at 50% 52%,
-      rgba(0, 0, 0, 0.08) 0%,
-      rgba(0, 0, 0, 0.05) 8%,
-      rgba(0, 0, 0, 0.02) 18%,
-      transparent 30%
-    ),
-    /* Mid-depth pull */
-    radial-gradient(
-      circle at 50% 52%,
-      #d8d8d8 0%,
-      #e4e4e4 12%,
-      #efefef 28%,
-      #f7f7f7 50%,
-      #ffffff 75%
-    );
-}
-
-/* Vignette — darkened edges create tunnel feel */
-.void-bg::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  background: radial-gradient(
-    ellipse 70% 60% at 50% 52%,
-    transparent 40%,
-    rgba(0, 0, 0, 0.03) 70%,
-    rgba(0, 0, 0, 0.06) 100%
-  );
-  pointer-events: none;
-}
-
-/* SVG noise texture */
-.void-noise {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  opacity: 0.06;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  background-repeat: repeat;
-  background-size: 256px 256px;
-  pointer-events: none;
-}
-
-/* === Gravity Rings === */
-
-.void-rings {
-  position: fixed;
-  top: 52%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 1;
-  pointer-events: none;
-}
-
-.void-ring {
-  position: absolute;
-  border-radius: 50%;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-}
-
-.void-ring-1 {
-  width: 140px;
-  height: 140px;
-  border: 1.5px solid rgba(0, 0, 0, 0.10);
-  box-shadow: 0 0 30px rgba(0, 0, 0, 0.03);
-  animation: ring-pulse 8s ease-in-out infinite;
-}
-
-.void-ring-2 {
-  width: 280px;
-  height: 280px;
-  border: 1px solid rgba(0, 0, 0, 0.07);
-  box-shadow: 0 0 40px rgba(0, 0, 0, 0.02);
-  animation: ring-pulse 8s ease-in-out infinite 2s;
-}
-
-.void-ring-3 {
-  width: 440px;
-  height: 440px;
-  border: 1px solid rgba(0, 0, 0, 0.05);
-  box-shadow: 0 0 50px rgba(0, 0, 0, 0.015);
-  animation: ring-pulse 8s ease-in-out infinite 4s;
-}
-
-.void-ring-4 {
-  width: 620px;
-  height: 620px;
-  border: 1px solid rgba(0, 0, 0, 0.03);
-  animation: ring-pulse 8s ease-in-out infinite 6s;
-}
-
-@keyframes ring-pulse {
-  0%, 100% {
-    transform: translate(-50%, -50%) scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: translate(-50%, -50%) scale(1.08);
-    opacity: 0.3;
-  }
-}
-
-/* On drag: rings contract */
-.page-dragging .void-ring-1 {
-  animation: ring-contract 0.6s ease-out forwards;
-}
-.page-dragging .void-ring-2 {
-  animation: ring-contract 0.6s ease-out 0.1s forwards;
-}
-.page-dragging .void-ring-3 {
-  animation: ring-contract 0.6s ease-out 0.2s forwards;
-}
-.page-dragging .void-ring-4 {
-  animation: ring-contract 0.6s ease-out 0.3s forwards;
-}
-
-@keyframes ring-contract {
-  to {
-    transform: translate(-50%, -50%) scale(0.85);
-    opacity: 0.6;
-  }
-}
-
 /* === Funnel Status Bar === */
 
 .funnel-status {
-  background: rgba(255, 255, 255, 0.7);
+  background: rgba(235, 235, 235, 0.7);
   backdrop-filter: blur(8px);
   padding: 12px 24px;
   width: 100%;
@@ -182,9 +48,9 @@ body {
 }
 
 .funnel-status span {
-  color: #262624 !important;
-  font-size: 13px !important;
-  font-weight: 400 !important;
+  color: #262624;
+  font-size: 13px;
+  font-weight: 400;
   opacity: 0.5;
 }
 
@@ -288,31 +154,6 @@ body {
   align-items: center;
   gap: 16px;
   cursor: default;
-}
-
-.drop-zone-ring {
-  width: 160px;
-  height: 160px;
-  border-radius: 50%;
-  border: 1.5px solid rgba(0, 0, 0, 0.12);
-  transition: border-color 0.3s, transform 0.3s, box-shadow 0.3s;
-  background: radial-gradient(
-    circle,
-    rgba(0, 0, 0, 0.06) 0%,
-    rgba(0, 0, 0, 0.03) 40%,
-    transparent 70%
-  );
-  box-shadow:
-    inset 0 0 30px rgba(0, 0, 0, 0.05),
-    0 0 60px rgba(0, 0, 0, 0.03);
-}
-
-.drop-zone:hover .drop-zone-ring {
-  border-color: rgba(0, 0, 0, 0.2);
-  transform: scale(1.05);
-  box-shadow:
-    inset 0 0 40px rgba(0, 0, 0, 0.08),
-    0 0 80px rgba(0, 0, 0, 0.05);
 }
 
 .drop-zone-text {
@@ -505,7 +346,7 @@ body {
   position: fixed;
   inset: 0;
   z-index: 9999;
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(235, 235, 235, 0.9);
   display: flex;
   align-items: center;
   justify-content: center;
