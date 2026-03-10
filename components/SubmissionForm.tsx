@@ -19,8 +19,12 @@ const PLACEHOLDERS: Record<ContentType, string> = {
 
 export default function SubmissionForm({
   onSubmitted,
+  droppedFile,
+  onFileConsumed,
 }: {
   onSubmitted: () => void;
+  droppedFile: File | null;
+  onFileConsumed: () => void;
 }) {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [selectedProfileId, setSelectedProfileId] = useState<string>("");
@@ -32,7 +36,6 @@ export default function SubmissionForm({
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [successMsg, setSuccessMsg] = useState(false);
-  const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -78,7 +81,6 @@ export default function SubmissionForm({
           setTitle(data.extracted_title);
         }
         if (data.extracted_text) {
-          // Truncate to a reasonable size for the body field
           setBody(data.extracted_text.slice(0, 8000));
         }
       }
@@ -89,25 +91,13 @@ export default function SubmissionForm({
     }
   }, []);
 
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      setDragOver(false);
-      const file = e.dataTransfer.files[0];
-      if (file) uploadAndExtract(file);
-    },
-    [uploadAndExtract]
-  );
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(false);
-  }, []);
+  // Handle file dropped at page level
+  useEffect(() => {
+    if (droppedFile) {
+      uploadAndExtract(droppedFile);
+      onFileConsumed();
+    }
+  }, [droppedFile, uploadAndExtract, onFileConsumed]);
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -181,51 +171,30 @@ export default function SubmissionForm({
 
   return (
     <div className="submission-form-wrapper">
-      {/* Drop zone — hero interaction */}
-      <div
-        className={`drop-zone ${dragOver ? "drop-zone-active" : ""} ${uploading ? "drop-zone-uploading" : ""}`}
-        onDrop={handleDrop}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onClick={() => !uploading && fileInputRef.current?.click()}
-      >
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".pdf"
-          onChange={handleFileInput}
-          style={{ display: "none" }}
-        />
-        {uploading ? (
-          <p className="drop-zone-text">Extracting content...</p>
-        ) : fileName ? (
-          <div className="drop-zone-file">
-            <p className="drop-zone-filename">{fileName}</p>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                clearFile();
-              }}
-              className="drop-zone-clear"
-            >
-              remove
-            </button>
-          </div>
-        ) : (
-          <>
-            <p className="drop-zone-text">Drop a PDF here</p>
-            <p className="drop-zone-hint">or click to browse</p>
-          </>
-        )}
-      </div>
+      {/* Upload status / file info */}
+      {uploading && (
+        <div className="upload-status">Extracting content from PDF...</div>
+      )}
 
-      {/* Divider */}
-      <div className="form-divider">
-        <span>or write something</span>
-      </div>
+      {fileName && !uploading && (
+        <div className="file-banner">
+          <span className="file-banner-name">{fileName}</span>
+          <button type="button" onClick={clearFile} className="file-banner-clear">
+            remove
+          </button>
+        </div>
+      )}
 
-      {/* Manual form */}
+      {/* Hidden file input for click-to-browse fallback */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf"
+        onChange={handleFileInput}
+        style={{ display: "none" }}
+      />
+
+      {/* Form */}
       <form onSubmit={handleSubmit}>
         {/* Type selector */}
         <div style={{ marginBottom: "20px" }}>
@@ -272,10 +241,23 @@ export default function SubmissionForm({
           />
         </div>
 
+        {/* Browse PDF link — only for paper type when no file yet */}
+        {contentType === "paper" && !filePath && (
+          <div style={{ marginBottom: "20px" }}>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="browse-link"
+            >
+              or browse for a PDF
+            </button>
+          </div>
+        )}
+
         {/* Submit */}
         <button
           type="submit"
-          disabled={submitting || !body.trim()}
+          disabled={submitting || uploading || !body.trim()}
           className="submit-btn"
         >
           {submitting ? "Dropping..." : "Drop it in"}

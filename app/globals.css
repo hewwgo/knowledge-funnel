@@ -133,59 +133,60 @@ body {
   background: #262624;
 }
 
-/* === Drop Zone === */
+/* === Full-page drag overlay === */
 
-.drop-zone {
-  border: 2px dashed #d4a574;
-  background: #ffffff;
-  padding: 40px 24px;
-  text-align: center;
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
-}
-
-.drop-zone:hover {
-  border-color: #c07830;
-  background: #fffaf5;
-}
-
-.drop-zone-active {
-  border-color: #c07830;
-  background: #fff0e0;
-  border-style: solid;
-}
-
-.drop-zone-uploading {
-  opacity: 0.7;
-  cursor: wait;
-}
-
-.drop-zone-text {
-  font-size: 16px;
-  font-weight: 500;
-  color: #262624;
-  margin-bottom: 4px;
-}
-
-.drop-zone-hint {
-  font-size: 13px;
-  color: #888888;
-}
-
-.drop-zone-file {
+.drag-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(255, 244, 235, 0.92);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  pointer-events: none;
 }
 
-.drop-zone-filename {
-  font-size: 14px;
+.drag-overlay-content {
+  border: 2.5px dashed #c07830;
+  padding: 60px 80px;
+}
+
+.drag-overlay-text {
+  font-size: 22px;
   font-weight: 500;
   color: #262624;
 }
 
-.drop-zone-clear {
+/* === Upload status / file banner === */
+
+.upload-status {
+  text-align: center;
+  padding: 16px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #c07830;
+  background: #ffffff;
+  border: 1.5px solid #d4a574;
+}
+
+.file-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  margin-bottom: 20px;
+  background: #ffffff;
+  border: 1.5px solid #262624;
+}
+
+.file-banner-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #262624;
+}
+
+.file-banner-clear {
   background: none;
   border: none;
   color: #c07830;
@@ -196,29 +197,17 @@ body {
   padding: 0;
 }
 
-/* === Form Divider === */
+/* === Browse link === */
 
-.form-divider {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin: 24px 0;
-}
-
-.form-divider::before,
-.form-divider::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: #d4a574;
-}
-
-.form-divider span {
-  font-size: 12px;
+.browse-link {
+  background: none;
+  border: none;
   color: #888888;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  white-space: nowrap;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: "Inter", sans-serif;
+  text-decoration: underline;
+  padding: 0;
 }
 
 /* === Submit Button === */
