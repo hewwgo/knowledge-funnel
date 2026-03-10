@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from "react";
 import FunnelStatus from "@/components/FunnelStatus";
 import SubmissionForm from "@/components/SubmissionForm";
 import SubmissionList from "@/components/SubmissionList";
-import PrismaticBurst from "@/components/PrismaticBurst";
 
 export default function Home() {
   const [refreshKey, setRefreshKey] = useState(0);
@@ -68,21 +67,22 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="page-root">
-      {/* Background shader */}
-      <PrismaticBurst
-        intensity={2.3}
-        speed={0.15}
-        distort={9.6}
-        colors={["#a03131", "#60a99d", "#566c04"]}
-      />
+    <div className={`page-root${dragOver ? " page-dragging" : ""}`}>
+      {/* Void background — radial gradient + noise */}
+      <div className="void-bg" />
+      <div className="void-noise" />
+
+      {/* Gravity rings */}
+      <div className="void-rings">
+        <div className="void-ring void-ring-1" />
+        <div className="void-ring void-ring-2" />
+        <div className="void-ring void-ring-3" />
+      </div>
 
       {/* Drag overlay */}
       {dragOver && (
         <div className="drag-overlay">
-          <div className="drag-overlay-content">
-            <p className="drag-overlay-text">Drop PDF here</p>
-          </div>
+          <p className="drag-overlay-text">Drop PDF here</p>
         </div>
       )}
 
