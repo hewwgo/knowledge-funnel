@@ -54,11 +54,9 @@ vec3 rayDir(vec2 frag, vec2 res, vec2 offset, float dist){
 
 float edgeFade(vec2 frag, vec2 res, vec2 offset){
     vec2 toC = frag - 0.5 * res - offset;
-    float r = length(toC) / (0.5 * min(res.x, res.y));
-    float x = clamp(r, 0.0, 1.0);
-    float q = x * x * x * (x * (x * 6.0 - 15.0) + 10.0);
-    float s = pow(q * 0.5, 1.5);
-    return clamp(1.0 - pow(1.0 - s, 2.0) * 0.2 - s, 0.0, 1.0);
+    float r = length(toC) / (0.5 * length(res));
+    float fade = smoothstep(1.0, 0.3, r);
+    return fade;
 }
 
 mat3 rotX(float a){ float c = cos(a), s = sin(a); return mat3(1.0,0.0,0.0, 0.0,c,-s, 0.0,s,c); }
