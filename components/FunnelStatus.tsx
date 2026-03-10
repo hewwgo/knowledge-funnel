@@ -22,14 +22,14 @@ export default function FunnelStatus() {
   if (!status) {
     return (
       <div className="funnel-status">
-        <p style={{ color: "#ffffff", fontSize: "14px" }}>Loading...</p>
+        <p className="funnel-status-text">Loading...</p>
       </div>
     );
   }
 
   return (
     <div className="funnel-status">
-      <span style={{ color: "#ffffff", fontSize: "14px", fontWeight: 500 }}>
+      <span>
         Cycle {status.cycle_number} | {status.total_papers} paper
         {status.total_papers !== 1 ? "s" : ""} from{" "}
         {status.contributor_count} contributor

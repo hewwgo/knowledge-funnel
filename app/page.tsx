@@ -77,6 +77,7 @@ export default function Home() {
         <div className="void-ring void-ring-1" />
         <div className="void-ring void-ring-2" />
         <div className="void-ring void-ring-3" />
+        <div className="void-ring void-ring-4" />
       </div>
 
       {/* Drag overlay */}
