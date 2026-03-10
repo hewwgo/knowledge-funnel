@@ -54,3 +54,15 @@ create table pitches (
 
 -- Seed cycle 1
 insert into cycles (cycle_number, status) values (1, 'collecting');
+
+-- Storage policy: allow anyone with anon key to upload PDFs
+-- Run this AFTER creating the funnel-uploads bucket in the Storage UI.
+insert into storage.policies (name, bucket_id, operation, definition)
+select
+  'Allow public uploads',
+  id,
+  'INSERT',
+  'true'
+from storage.buckets
+where name = 'funnel-uploads'
+on conflict do nothing;

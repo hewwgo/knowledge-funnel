@@ -1,6 +1,18 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
+
+let _supabase: SupabaseClient | null = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+  }
+  return _supabase;
+}
 
 interface Profile {
   id: string;
@@ -67,17 +79,29 @@ export default function SubmissionForm({
     setContentType("paper");
 
     try {
-      const formData = new FormData();
-      formData.append("file", file);
+      // Step 1: Upload directly to Supabase Storage (bypasses Vercel size limit)
+      const storagePath = `${Date.now()}-${file.name}`;
+      const { error: uploadError } = await getSupabase().storage
+        .from("funnel-uploads")
+        .upload(storagePath, file, { contentType: "application/pdf" });
+
+      if (uploadError) {
+        console.error("Storage upload failed:", uploadError);
+        return;
+      }
+
+      setFilePath(storagePath);
+      setFileName(file.name);
+
+      // Step 2: Call API for text extraction + LLM metadata (only sends file path)
       const res = await fetch("/api/upload", {
         method: "POST",
-        body: formData,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file_path: storagePath }),
       });
 
       if (res.ok) {
         const data = await res.json();
-        setFilePath(data.file_path);
-        setFileName(data.file_name);
         if (data.title) setTitle(data.title);
         if (data.abstract) setBody(data.abstract);
         if (data.keywords) setKeywords(data.keywords);

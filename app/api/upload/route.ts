@@ -5,35 +5,30 @@ import { extractPaperMetadata } from "@/lib/llm";
 
 export const maxDuration = 60;
 
+// This endpoint now only handles extraction — the file is already in Supabase Storage.
+// It downloads the PDF from storage, extracts text, and runs LLM metadata extraction.
 export async function POST(request: NextRequest) {
-  const formData = await request.formData();
-  const file = formData.get("file") as File | null;
+  const { file_path } = await request.json();
 
-  if (!file) {
-    return NextResponse.json({ error: "No file provided" }, { status: 400 });
+  if (!file_path) {
+    return NextResponse.json({ error: "file_path is required" }, { status: 400 });
   }
 
-  if (!file.name.toLowerCase().endsWith(".pdf")) {
+  const supabase = getSupabaseAdmin();
+
+  // Download file from Supabase Storage
+  const { data: fileData, error: downloadError } = await supabase.storage
+    .from("funnel-uploads")
+    .download(file_path);
+
+  if (downloadError || !fileData) {
     return NextResponse.json(
-      { error: "Only PDF files are accepted" },
-      { status: 400 }
+      { error: downloadError?.message || "Failed to download file" },
+      { status: 500 }
     );
   }
 
-  const buffer = new Uint8Array(await file.arrayBuffer());
-  const supabase = getSupabaseAdmin();
-  const fileName = `${Date.now()}-${file.name}`;
-
-  // Upload to Supabase Storage
-  const { error: uploadError } = await supabase.storage
-    .from("funnel-uploads")
-    .upload(fileName, buffer, {
-      contentType: "application/pdf",
-    });
-
-  if (uploadError) {
-    return NextResponse.json({ error: uploadError.message }, { status: 500 });
-  }
+  const buffer = new Uint8Array(await fileData.arrayBuffer());
 
   // Extract raw text from PDF
   let rawText = "";
@@ -71,11 +66,5 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({
-    file_path: fileName,
-    file_name: file.name,
-    title,
-    abstract,
-    keywords,
-  });
+  return NextResponse.json({ title, abstract, keywords });
 }
