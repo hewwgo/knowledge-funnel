@@ -1,0 +1,265 @@
+@import "tailwindcss";
+
+/* === Base Reset === */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: #ffffff;
+  color: #262624;
+  font-family: "Inter", sans-serif;
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* === Funnel Status Bar === */
+
+.funnel-status {
+  background: #262624;
+  padding: 16px 24px;
+  width: 100%;
+}
+
+/* === Submission Form === */
+
+.submission-form-wrapper {
+  border: 1.5px solid #d4a574;
+  background: #fff4eb;
+  padding: 32px;
+}
+
+.form-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #888888;
+  margin-bottom: 6px;
+}
+
+.form-select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1.5px solid #262624;
+  border-radius: 0;
+  background: #ffffff;
+  font-size: 14px;
+  font-family: "Inter", sans-serif;
+  color: #262624;
+  appearance: auto;
+}
+
+.form-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1.5px solid #262624;
+  border-radius: 0;
+  background: #ffffff;
+  font-size: 14px;
+  font-family: "Inter", sans-serif;
+  color: #262624;
+}
+
+.form-textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1.5px solid #262624;
+  border-radius: 0;
+  background: #ffffff;
+  font-size: 14px;
+  font-family: "Inter", sans-serif;
+  color: #262624;
+  resize: vertical;
+}
+
+.form-file {
+  font-size: 13px;
+  font-family: "Inter", sans-serif;
+  color: #262624;
+}
+
+.form-input::placeholder,
+.form-textarea::placeholder {
+  color: #888888;
+}
+
+.form-input:focus,
+.form-textarea:focus,
+.form-select:focus {
+  outline: none;
+  border-color: #c07830;
+}
+
+/* === Type Selector === */
+
+.type-selector {
+  display: flex;
+  gap: 0;
+}
+
+.type-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border: 1.5px solid #262624;
+  background: #ffffff;
+  color: #262624;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: "Inter", sans-serif;
+  cursor: pointer;
+  border-radius: 0;
+  transition: background 0.15s, color 0.15s;
+}
+
+.type-btn + .type-btn {
+  border-left: 0;
+}
+
+.type-btn:hover {
+  background: #f5f5f5;
+}
+
+.type-btn-active {
+  background: #262624;
+  color: #ffffff;
+}
+
+.type-btn-active:hover {
+  background: #262624;
+}
+
+/* === Submit Button === */
+
+.submit-btn {
+  width: 100%;
+  padding: 14px;
+  background: #262624;
+  color: #ffffff;
+  border: none;
+  border-radius: 0;
+  font-size: 15px;
+  font-weight: 500;
+  font-family: "Inter", sans-serif;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.submit-btn:hover {
+  opacity: 0.9;
+}
+
+.submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* === Success Message === */
+
+.success-msg {
+  margin-top: 12px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 500;
+  color: #c07830;
+}
+
+/* === Submissions List === */
+
+.submissions-list {
+  padding: 0;
+}
+
+.section-title {
+  font-size: 14px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #888888;
+  margin-bottom: 16px;
+}
+
+.muted-text {
+  font-size: 14px;
+  color: #888888;
+  line-height: 1.6;
+}
+
+.submission-items {
+  list-style: none;
+}
+
+.submission-item {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid #eee;
+  font-size: 14px;
+}
+
+.submission-type {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #c07830;
+  flex-shrink: 0;
+  width: 48px;
+}
+
+.submission-text {
+  flex: 1;
+  color: #262624;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.submission-time {
+  font-size: 12px;
+  color: #888888;
+  flex-shrink: 0;
+}
+
+/* === Header === */
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 0;
+  border-bottom: 1.5px solid #262624;
+  margin-bottom: 32px;
+}
+
+.header-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #262624;
+  letter-spacing: -0.01em;
+}
+
+.header-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #888888;
+}
+
+.header-user button {
+  background: none;
+  border: none;
+  color: #c07830;
+  cursor: pointer;
+  font-size: 12px;
+  font-family: "Inter", sans-serif;
+  text-decoration: underline;
+  padding: 0;
+}
