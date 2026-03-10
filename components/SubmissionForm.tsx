@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 interface Profile {
   id: string;
@@ -24,13 +24,15 @@ export default function SubmissionForm({
 }) {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [selectedProfileId, setSelectedProfileId] = useState<string>("");
-  const [selectedName, setSelectedName] = useState<string>("");
   const [contentType, setContentType] = useState<ContentType>("paper");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
-  const [file, setFile] = useState<File | null>(null);
+  const [filePath, setFilePath] = useState<string | null>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [successMsg, setSuccessMsg] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -38,12 +40,9 @@ export default function SubmissionForm({
       .then((res) => res.json())
       .then((data: Profile[]) => {
         setProfiles(data);
-        // Restore from localStorage
         const savedId = localStorage.getItem("funnel_profile_id");
-        const savedName = localStorage.getItem("funnel_profile_name");
         if (savedId && data.some((p) => p.id === savedId)) {
           setSelectedProfileId(savedId);
-          setSelectedName(savedName || "");
         }
       })
       .catch(console.error);
@@ -52,18 +51,75 @@ export default function SubmissionForm({
   const handleProfileChange = (profileId: string) => {
     const profile = profiles.find((p) => p.id === profileId);
     setSelectedProfileId(profileId);
-    setSelectedName(profile?.name || "");
     if (profileId) {
       localStorage.setItem("funnel_profile_id", profileId);
       localStorage.setItem("funnel_profile_name", profile?.name || "");
     }
   };
 
-  const clearProfile = () => {
-    setSelectedProfileId("");
-    setSelectedName("");
-    localStorage.removeItem("funnel_profile_id");
-    localStorage.removeItem("funnel_profile_name");
+  const uploadAndExtract = useCallback(async (file: File) => {
+    if (!file.name.toLowerCase().endsWith(".pdf")) return;
+    setUploading(true);
+    setContentType("paper");
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setFilePath(data.file_path);
+        setFileName(data.file_name);
+        if (data.extracted_title) {
+          setTitle(data.extracted_title);
+        }
+        if (data.extracted_text) {
+          // Truncate to a reasonable size for the body field
+          setBody(data.extracted_text.slice(0, 8000));
+        }
+      }
+    } catch (err) {
+      console.error("Upload failed:", err);
+    } finally {
+      setUploading(false);
+    }
+  }, []);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setDragOver(false);
+      const file = e.dataTransfer.files[0];
+      if (file) uploadAndExtract(file);
+    },
+    [uploadAndExtract]
+  );
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+  }, []);
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) uploadAndExtract(file);
+  };
+
+  const clearFile = () => {
+    setFilePath(null);
+    setFileName(null);
+    setTitle("");
+    setBody("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -73,22 +129,6 @@ export default function SubmissionForm({
     setSubmitting(true);
 
     try {
-      let filePath: string | null = null;
-
-      // Upload PDF if present
-      if (file && contentType === "paper") {
-        const formData = new FormData();
-        formData.append("file", file);
-        const uploadRes = await fetch("/api/upload", {
-          method: "POST",
-          body: formData,
-        });
-        if (uploadRes.ok) {
-          const uploadData = await uploadRes.json();
-          filePath = uploadData.file_path;
-        }
-      }
-
       const res = await fetch("/api/submissions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -104,7 +144,8 @@ export default function SubmissionForm({
       if (res.ok) {
         setTitle("");
         setBody("");
-        setFile(null);
+        setFilePath(null);
+        setFileName(null);
         if (fileInputRef.current) fileInputRef.current.value = "";
         setSuccessMsg(true);
         setTimeout(() => setSuccessMsg(false), 3000);
@@ -117,98 +158,131 @@ export default function SubmissionForm({
     }
   };
 
+  // If no profile selected, show just the dropdown
+  if (!selectedProfileId) {
+    return (
+      <div className="submission-form-wrapper">
+        <label className="form-label">Your name</label>
+        <select
+          value={selectedProfileId}
+          onChange={(e) => handleProfileChange(e.target.value)}
+          className="form-select"
+        >
+          <option value="">Select your name...</option>
+          {profiles.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+      </div>
+    );
+  }
+
   return (
     <div className="submission-form-wrapper">
-      <form onSubmit={handleSubmit}>
-        {/* Name selector */}
-        {!selectedProfileId ? (
-          <div style={{ marginBottom: "20px" }}>
-            <label className="form-label">Your name</label>
-            <select
-              value={selectedProfileId}
-              onChange={(e) => handleProfileChange(e.target.value)}
-              className="form-select"
-            >
-              <option value="">Select your name...</option>
-              {profiles.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        ) : null}
-
-        {selectedProfileId && (
-          <>
-            {/* Type selector */}
-            <div style={{ marginBottom: "20px" }}>
-              <label className="form-label">Type</label>
-              <div className="type-selector">
-                {CONTENT_TYPES.map((type) => (
-                  <button
-                    key={type}
-                    type="button"
-                    className={`type-btn ${contentType === type ? "type-btn-active" : ""}`}
-                    onClick={() => setContentType(type)}
-                  >
-                    {type.charAt(0).toUpperCase() + type.slice(1)}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Title */}
-            <div style={{ marginBottom: "20px" }}>
-              <label className="form-label">Title</label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Give it a short label (optional)"
-                className="form-input"
-              />
-            </div>
-
-            {/* Content */}
-            <div style={{ marginBottom: "20px" }}>
-              <label className="form-label">Content</label>
-              <textarea
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-                placeholder={PLACEHOLDERS[contentType]}
-                className="form-textarea"
-                rows={5}
-                required
-              />
-            </div>
-
-            {/* PDF upload — only for papers */}
-            {contentType === "paper" && (
-              <div style={{ marginBottom: "20px" }}>
-                <label className="form-label">Upload PDF</label>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".pdf"
-                  onChange={(e) => setFile(e.target.files?.[0] || null)}
-                  className="form-file"
-                />
-              </div>
-            )}
-
-            {/* Submit */}
+      {/* Drop zone — hero interaction */}
+      <div
+        className={`drop-zone ${dragOver ? "drop-zone-active" : ""} ${uploading ? "drop-zone-uploading" : ""}`}
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onClick={() => !uploading && fileInputRef.current?.click()}
+      >
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".pdf"
+          onChange={handleFileInput}
+          style={{ display: "none" }}
+        />
+        {uploading ? (
+          <p className="drop-zone-text">Extracting content...</p>
+        ) : fileName ? (
+          <div className="drop-zone-file">
+            <p className="drop-zone-filename">{fileName}</p>
             <button
-              type="submit"
-              disabled={submitting || !body.trim()}
-              className="submit-btn"
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                clearFile();
+              }}
+              className="drop-zone-clear"
             >
-              {submitting ? "Dropping..." : "Drop it in"}
+              remove
             </button>
-
-            {/* Success message */}
-            {successMsg && <p className="success-msg">Added to the funnel &#10003;</p>}
+          </div>
+        ) : (
+          <>
+            <p className="drop-zone-text">Drop a PDF here</p>
+            <p className="drop-zone-hint">or click to browse</p>
           </>
+        )}
+      </div>
+
+      {/* Divider */}
+      <div className="form-divider">
+        <span>or write something</span>
+      </div>
+
+      {/* Manual form */}
+      <form onSubmit={handleSubmit}>
+        {/* Type selector */}
+        <div style={{ marginBottom: "20px" }}>
+          <div className="type-selector">
+            {CONTENT_TYPES.map((type) => (
+              <button
+                key={type}
+                type="button"
+                className={`type-btn ${contentType === type ? "type-btn-active" : ""}`}
+                onClick={() => {
+                  setContentType(type);
+                  if (!filePath) {
+                    setTitle("");
+                    setBody("");
+                  }
+                }}
+              >
+                {type.charAt(0).toUpperCase() + type.slice(1)}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Title */}
+        <div style={{ marginBottom: "20px" }}>
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Give it a short label (optional)"
+            className="form-input"
+          />
+        </div>
+
+        {/* Content */}
+        <div style={{ marginBottom: "20px" }}>
+          <textarea
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder={PLACEHOLDERS[contentType]}
+            className="form-textarea"
+            rows={filePath ? 8 : 4}
+            required
+          />
+        </div>
+
+        {/* Submit */}
+        <button
+          type="submit"
+          disabled={submitting || !body.trim()}
+          className="submit-btn"
+        >
+          {submitting ? "Dropping..." : "Drop it in"}
+        </button>
+
+        {successMsg && (
+          <p className="success-msg">Added to the funnel &#10003;</p>
         )}
       </form>
     </div>

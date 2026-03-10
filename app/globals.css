@@ -133,6 +133,94 @@ body {
   background: #262624;
 }
 
+/* === Drop Zone === */
+
+.drop-zone {
+  border: 2px dashed #d4a574;
+  background: #ffffff;
+  padding: 40px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.drop-zone:hover {
+  border-color: #c07830;
+  background: #fffaf5;
+}
+
+.drop-zone-active {
+  border-color: #c07830;
+  background: #fff0e0;
+  border-style: solid;
+}
+
+.drop-zone-uploading {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.drop-zone-text {
+  font-size: 16px;
+  font-weight: 500;
+  color: #262624;
+  margin-bottom: 4px;
+}
+
+.drop-zone-hint {
+  font-size: 13px;
+  color: #888888;
+}
+
+.drop-zone-file {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.drop-zone-filename {
+  font-size: 14px;
+  font-weight: 500;
+  color: #262624;
+}
+
+.drop-zone-clear {
+  background: none;
+  border: none;
+  color: #c07830;
+  cursor: pointer;
+  font-size: 12px;
+  font-family: "Inter", sans-serif;
+  text-decoration: underline;
+  padding: 0;
+}
+
+/* === Form Divider === */
+
+.form-divider {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 24px 0;
+}
+
+.form-divider::before,
+.form-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #d4a574;
+}
+
+.form-divider span {
+  font-size: 12px;
+  color: #888888;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
 /* === Submit Button === */
 
 .submit-btn {
