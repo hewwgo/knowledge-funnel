@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import FunnelStatus from "@/components/FunnelStatus";
 import SubmissionForm from "@/components/SubmissionForm";
 import SubmissionList from "@/components/SubmissionList";
+import PrismaticBurst from "@/components/PrismaticBurst";
 
 export default function Home() {
   const [refreshKey, setRefreshKey] = useState(0);
@@ -70,6 +71,14 @@ export default function Home() {
 
   return (
     <div style={{ minHeight: "100vh", position: "relative" }}>
+      {/* Background shader — very subtle */}
+      <PrismaticBurst
+        intensity={2.3}
+        speed={0.15}
+        distort={9.6}
+        colors={["#a03131", "#60a99d", "#566c04"]}
+      />
+
       {/* Full-page drag overlay */}
       {dragOver && (
         <div className="drag-overlay">
@@ -80,6 +89,7 @@ export default function Home() {
       )}
 
       {/* Status bar — full width */}
+      <div style={{ position: "relative", zIndex: 1 }}>
       <FunnelStatus />
 
       {/* Content — centered column */}
@@ -112,6 +122,7 @@ export default function Home() {
 
         {/* User's Submissions */}
         <SubmissionList refreshKey={refreshKey} />
+      </div>
       </div>
     </div>
   );
