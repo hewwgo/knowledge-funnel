@@ -25,6 +25,7 @@ export default function VoidFunnel({ dragging = false }: VoidFunnelProps) {
     let H = 0;
 
     const resize = () => {
+      if (!ctx) return;
       const dpr = window.devicePixelRatio || 1;
       W = window.innerWidth;
       H = window.innerHeight;
@@ -38,6 +39,7 @@ export default function VoidFunnel({ dragging = false }: VoidFunnelProps) {
     resize();
 
     function draw(time: number) {
+      if (!ctx) return;
       // Smooth drag interpolation
       dragVal.current += (dragTarget.current - dragVal.current) * 0.04;
       const d = dragVal.current;
