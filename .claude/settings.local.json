@@ -17,7 +17,8 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "Bash(rm components/PrismaticBurst.tsx)",
       "Bash(npm uninstall ogl)",
-      "WebFetch(domain:www.freepik.com)"
+      "WebFetch(domain:www.freepik.com)",
+      "Bash(npm install ogl@^1.0.11)"
     ]
   }
 }
