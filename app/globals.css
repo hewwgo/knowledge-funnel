@@ -217,6 +217,22 @@ body {
   background: #ffffff;
 }
 
+/* === PDF drop hint === */
+
+.pdf-drop-hint {
+  text-align: center;
+  padding: 20px;
+  margin-bottom: 24px;
+  border: 1.5px dashed #d4a574;
+  background: #ffffff;
+}
+
+.pdf-drop-hint-text {
+  font-size: 14px;
+  color: #888888;
+  margin-bottom: 6px;
+}
+
 /* === Browse link === */
 
 .browse-link {
@@ -334,6 +350,8 @@ body {
 .submission-text-expanded {
   white-space: normal;
   line-height: 1.5;
+  overflow: visible;
+  text-overflow: unset;
 }
 
 .submission-standalone {

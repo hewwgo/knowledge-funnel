@@ -220,6 +220,15 @@ export default function SubmissionForm({
 
   return (
     <div className="submission-form-wrapper">
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf"
+        onChange={handleFileInput}
+        style={{ display: "none" }}
+      />
+
       {/* Upload status */}
       {uploading && (
         <div className="upload-status">
@@ -227,12 +236,28 @@ export default function SubmissionForm({
         </div>
       )}
 
-      {/* File banner */}
+      {/* File banner (after upload) */}
       {fileName && !uploading && (
         <div className="file-banner">
           <span className="file-banner-name">{fileName}</span>
           <button type="button" onClick={clearAll} className="file-banner-clear">
             remove
+          </button>
+        </div>
+      )}
+
+      {/* Drop hint + browse (before upload) */}
+      {!filePath && !uploading && (
+        <div className="pdf-drop-hint">
+          <p className="pdf-drop-hint-text">
+            Drag &amp; drop a PDF anywhere on this page
+          </p>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="browse-link"
+          >
+            or browse for a PDF
           </button>
         </div>
       )}
@@ -247,15 +272,6 @@ export default function SubmissionForm({
           ))}
         </div>
       )}
-
-      {/* Hidden file input */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".pdf"
-        onChange={handleFileInput}
-        style={{ display: "none" }}
-      />
 
       <form onSubmit={handleSubmit}>
         {/* Title */}
@@ -276,7 +292,7 @@ export default function SubmissionForm({
           <textarea
             value={abstract}
             onChange={(e) => setAbstract(e.target.value)}
-            placeholder="Drop a PDF above, or paste an abstract here"
+            placeholder="Paste an abstract here, or drop a PDF above"
             className="form-textarea"
             rows={filePath ? 6 : 3}
           />
@@ -305,19 +321,6 @@ export default function SubmissionForm({
             rows={2}
           />
         </div>
-
-        {/* Browse PDF link when no file yet */}
-        {!filePath && !uploading && (
-          <div style={{ marginBottom: "20px" }}>
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="browse-link"
-            >
-              or browse for a PDF
-            </button>
-          </div>
-        )}
 
         {/* Submit */}
         <button
