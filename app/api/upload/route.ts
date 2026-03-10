@@ -3,6 +3,8 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { extractText } from "unpdf";
 import { extractPaperMetadata } from "@/lib/llm";
 
+export const maxDuration = 60;
+
 export async function POST(request: NextRequest) {
   const formData = await request.formData();
   const file = formData.get("file") as File | null;
