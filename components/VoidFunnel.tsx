@@ -13,7 +13,6 @@ void main() {
 }
 `;
 
-// Stripped-down fragment: 22 steps instead of 44, simpler noise
 const fragmentShader = `#version 300 es
 precision mediump float;
 precision mediump int;
@@ -38,7 +37,7 @@ float hash21(vec2 p){
 mat2 rot30(){ return mat2(0.8, -0.5, 0.5, 0.8); }
 
 float layeredNoise(vec2 fragPx){
-    vec2 p = mod(fragPx + vec2(uTime * 30.0, -uTime * 21.0), 1024.0);
+    vec2 p = mod(fragPx + vec2(uTime * 25.0, -uTime * 18.0), 1024.0);
     vec2 q = rot30() * p;
     float n = 0.0;
     n += 0.50 * hash21(q);
@@ -50,13 +49,6 @@ float layeredNoise(vec2 fragPx){
 vec3 rayDir(vec2 frag, vec2 res, vec2 offset, float dist){
     float focal = res.y * max(dist, 1e-3);
     return normalize(vec3(2.0 * (frag - offset) - res, focal));
-}
-
-float edgeFade(vec2 frag, vec2 res, vec2 offset){
-    vec2 toC = frag - 0.5 * res - offset;
-    float r = length(toC) / (0.5 * length(res));
-    float fade = smoothstep(1.0, 0.3, r);
-    return fade;
 }
 
 mat3 rotX(float a){ float c = cos(a), s = sin(a); return mat3(1.0,0.0,0.0, 0.0,c,-s, 0.0,s,c); }
@@ -73,8 +65,8 @@ vec2 rot2(vec2 v, float a){
 }
 
 float bendAngle(vec3 q, float t){
-    return 0.8 * sin(q.x * 0.55 + t * 0.6)
-         + 0.6 * sin(q.z * 0.60 + t * 0.7);
+    return 0.7 * sin(q.x * 0.5 + t * 0.5)
+         + 0.5 * sin(q.z * 0.55 + t * 0.6);
 }
 
 void main(){
@@ -85,44 +77,44 @@ void main(){
     vec3 col = vec3(0.0);
     float n = layeredNoise(frag);
 
-    vec3 ang = vec3(t * 0.31, t * 0.21, t * 0.17);
+    vec3 ang = vec3(t * 0.25, t * 0.17, t * 0.13);
     mat3 rot3dMat = rotZ(ang.z) * rotY(ang.y) * rotX(ang.x);
 
-    float amp = clamp(uDistort, 0.0, 50.0) * 0.15;
+    float amp = clamp(uDistort, 0.0, 50.0) * 0.12;
 
-    // 22 iterations instead of 44
-    for (int i = 0; i < 22; ++i) {
+    for (int i = 0; i < 24; ++i) {
         vec3 P = marchT * dir;
-        P.z -= 2.0;
+        P.z -= 2.5;
         float rad = length(P);
-        vec3 Pl = rot3dMat * (P * (10.0 / max(rad, 1e-6)));
+        vec3 Pl = rot3dMat * (P * (8.0 / max(rad, 1e-6)));
 
-        float stepLen = min(rad - 0.3, n * 0.01) + 0.15;
+        float stepLen = min(rad - 0.3, n * 0.01) + 0.18;
 
-        float grow = smoothstep(0.35, 3.0, marchT);
-        float a1 = amp * grow * bendAngle(Pl * 0.6, t);
+        float grow = smoothstep(0.3, 4.0, marchT);
+        float a1 = amp * grow * bendAngle(Pl * 0.5, t);
         vec3 Pb = Pl;
         Pb.xz = rot2(Pb.xz, a1);
 
-        float rayPattern = smoothstep(
-            0.5, 0.7,
-            sin(Pb.x + cos(Pb.y) * cos(Pb.z)) *
-            sin(Pb.z + sin(Pb.y) * cos(Pb.x + t))
-        );
+        // Smoother pattern — less sharp shards
+        float pattern = sin(Pb.x + cos(Pb.y) * cos(Pb.z)) *
+                        sin(Pb.z + sin(Pb.y) * cos(Pb.x + t));
+        float rayPattern = smoothstep(0.3, 0.8, pattern);
 
-        float saw = fract(marchT * 0.25);
+        float saw = fract(marchT * 0.2);
         float tRay = saw * saw * (3.0 - 2.0 * saw);
         vec3 spectral = 2.0 * sampleGradient(tRay);
 
-        vec3 base = (0.05 / (0.4 + stepLen))
-                  * smoothstep(5.0, 0.0, rad)
+        // Smooth radial falloff — no hard circle cutoff
+        float radFade = 1.0 / (1.0 + rad * rad * 0.15);
+
+        vec3 base = (0.04 / (0.5 + stepLen))
+                  * radFade
                   * spectral;
 
         col += base * rayPattern;
         marchT += stepLen;
     }
 
-    col *= edgeFade(frag, uResolution, uOffset);
     col *= uIntensity;
 
     fragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
@@ -148,8 +140,8 @@ export default function VoidFunnel() {
     const container = containerRef.current;
     if (!container) return;
 
-    // Cap DPR at 1 for performance
-    const renderer = new Renderer({ dpr: 1, alpha: false, antialias: false });
+    // DPR 1.5 for smoother rendering without full retina cost
+    const renderer = new Renderer({ dpr: Math.min(window.devicePixelRatio || 1, 1.5), alpha: false, antialias: false });
     const gl = renderer.gl;
 
     gl.canvas.style.position = "absolute";
@@ -158,8 +150,8 @@ export default function VoidFunnel() {
     gl.canvas.style.height = "100%";
     container.appendChild(gl.canvas as HTMLCanvasElement);
 
-    // Single muted color gradient
-    const colors = ["#3a4550", "#2a3540", "#3a4550"];
+    // Muted cool tones
+    const colors = ["#2a3845", "#1e2d3a", "#2a3845"];
     const colorCount = colors.length;
     const data = new Uint8Array(colorCount * 4);
     for (let i = 0; i < colorCount; i++) {
@@ -184,12 +176,12 @@ export default function VoidFunnel() {
       uniforms: {
         uResolution: { value: [1, 1] },
         uTime: { value: 0 },
-        uIntensity: { value: 1.6 },
-        uSpeed: { value: 0.08 },
+        uIntensity: { value: 1.8 },
+        uSpeed: { value: 0.06 },
         uOffset: { value: [0, 0] },
         uGradient: { value: gradientTex },
         uColorCount: { value: colorCount },
-        uDistort: { value: 5.0 },
+        uDistort: { value: 4.0 },
       },
     });
 
