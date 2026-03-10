@@ -69,8 +69,8 @@ export default function Home() {
 
   return (
     <div className="page-root">
-      {/* Wireframe funnel canvas */}
-      <VoidFunnel dragging={dragOver} />
+      {/* Wormhole background */}
+      <VoidFunnel />
 
       {/* Drag overlay */}
       {dragOver && (
