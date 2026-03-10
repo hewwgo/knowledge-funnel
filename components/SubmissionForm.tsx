@@ -300,7 +300,7 @@ export default function SubmissionForm({
           <textarea
             value={idea}
             onChange={(e) => setIdea(e.target.value)}
-            placeholder="Did this spark a research idea? Describe it — rough is fine"
+            placeholder="A rough idea is fine"
             className="form-textarea"
             rows={2}
           />
