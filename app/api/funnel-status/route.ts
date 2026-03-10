@@ -15,19 +15,19 @@ export async function GET() {
 
   if (!cycle) {
     return NextResponse.json({
-      total_submissions: 0,
+      total_papers: 0,
       contributor_count: 0,
       days_remaining: 0,
       cycle_number: 0,
-      cycle_target: 15,
     });
   }
 
-  // Count submissions in this cycle
-  const { count: totalSubmissions } = await supabase
+  // Count only papers in this cycle (notes/ideas are bonus context)
+  const { count: totalPapers } = await supabase
     .from("submissions")
     .select("*", { count: "exact", head: true })
-    .eq("cycle_id", cycle.id);
+    .eq("cycle_id", cycle.id)
+    .eq("content_type", "paper");
 
   // Count distinct contributors
   const { data: contributors } = await supabase
@@ -49,10 +49,9 @@ export async function GET() {
   );
 
   return NextResponse.json({
-    total_submissions: totalSubmissions || 0,
+    total_papers: totalPapers || 0,
     contributor_count: uniqueContributors,
     days_remaining: daysRemaining,
     cycle_number: cycle.cycle_number,
-    cycle_target: 15,
   });
 }
