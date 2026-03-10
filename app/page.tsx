@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import FunnelStatus from "@/components/FunnelStatus";
 import SubmissionForm from "@/components/SubmissionForm";
 import SubmissionList from "@/components/SubmissionList";
@@ -10,38 +10,23 @@ export default function Home() {
   const [selectedName, setSelectedName] = useState<string>("");
   const [droppedFile, setDroppedFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
-  const dragCounter = useRef(0);
-
   useEffect(() => {
     const name = localStorage.getItem("funnel_profile_name");
     if (name) setSelectedName(name);
   }, []);
 
-  // All drag/drop handling at the window level to prevent browser default
+  // All drag/drop on document level — must preventDefault on dragover
+  // for drop to fire, and use capture phase to beat the browser default
   useEffect(() => {
-    const handleDragEnter = (e: DragEvent) => {
-      e.preventDefault();
-      dragCounter.current++;
-      if (e.dataTransfer?.types.includes("Files")) {
-        setDragOver(true);
-      }
-    };
-
-    const handleDragLeave = (e: DragEvent) => {
-      e.preventDefault();
-      dragCounter.current--;
-      if (dragCounter.current === 0) {
-        setDragOver(false);
-      }
-    };
-
     const handleDragOver = (e: DragEvent) => {
       e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+      if (!dragOver) setDragOver(true);
     };
 
     const handleDrop = (e: DragEvent) => {
       e.preventDefault();
-      dragCounter.current = 0;
+      e.stopPropagation();
       setDragOver(false);
       const file = e.dataTransfer?.files[0];
       if (file && file.name.toLowerCase().endsWith(".pdf")) {
@@ -49,17 +34,22 @@ export default function Home() {
       }
     };
 
-    window.addEventListener("dragenter", handleDragEnter);
-    window.addEventListener("dragleave", handleDragLeave);
-    window.addEventListener("dragover", handleDragOver);
-    window.addEventListener("drop", handleDrop);
-    return () => {
-      window.removeEventListener("dragenter", handleDragEnter);
-      window.removeEventListener("dragleave", handleDragLeave);
-      window.removeEventListener("dragover", handleDragOver);
-      window.removeEventListener("drop", handleDrop);
+    const handleDragLeave = (e: DragEvent) => {
+      // Only hide overlay when leaving the document entirely
+      if (e.relatedTarget === null) {
+        setDragOver(false);
+      }
     };
-  }, []);
+
+    document.addEventListener("dragover", handleDragOver);
+    document.addEventListener("drop", handleDrop);
+    document.addEventListener("dragleave", handleDragLeave);
+    return () => {
+      document.removeEventListener("dragover", handleDragOver);
+      document.removeEventListener("drop", handleDrop);
+      document.removeEventListener("dragleave", handleDragLeave);
+    };
+  }, [dragOver]);
 
   const handleSubmitted = useCallback(() => {
     setRefreshKey((k) => k + 1);
