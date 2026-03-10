@@ -562,6 +562,16 @@ body {
   color: rgba(255, 255, 255, 0.95);
 }
 
+.submission-link-anchor {
+  color: rgba(180, 210, 255, 0.85);
+  text-decoration: none;
+}
+
+.submission-link-anchor:hover {
+  color: rgba(180, 210, 255, 1);
+  text-decoration: underline;
+}
+
 .submission-text-expanded {
   white-space: normal;
   line-height: 1.4;

@@ -141,15 +141,24 @@ export default function SubmissionList({
                     onClick={() => isLong && toggleExpand(child.id)}
                   >
                     <span className="submission-type">
-                      {child.content_type === "thought"
-                        ? "Thought"
+                      {child.content_type === "link"
+                        ? "Link"
                         : child.content_type === "idea"
                           ? "Idea"
                           : "Note"}
                     </span>
-                    <span className={`submission-text${isExpanded ? " submission-text-expanded" : ""}`}>
-                      {isExpanded ? child.body : child.body.slice(0, 80)}
-                      {!isExpanded && isLong ? "..." : ""}
+                    <span className={`submission-text${isExpanded ? " submission-text-expanded" : ""}${child.content_type === "link" ? " submission-link" : ""}`}>
+                      {child.content_type === "link" ? (
+                        <a href={child.body} target="_blank" rel="noopener noreferrer" className="submission-link-anchor">
+                          {isExpanded ? child.body : child.body.slice(0, 80)}
+                          {!isExpanded && isLong ? "..." : ""}
+                        </a>
+                      ) : (
+                        <>
+                          {isExpanded ? child.body : child.body.slice(0, 80)}
+                          {!isExpanded && isLong ? "..." : ""}
+                        </>
+                      )}
                     </span>
                     {!group.paper && (
                       <span className="submission-time">

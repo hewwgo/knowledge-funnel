@@ -141,7 +141,7 @@ export default function SubmissionForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           profile_id: selectedProfileId,
-          content_type: "url",
+          content_type: "link",
           title: urlValue.trim(),
           body: urlValue.trim(),
           file_path: null,
@@ -168,7 +168,7 @@ export default function SubmissionForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           profile_id: selectedProfileId,
-          content_type: "thought",
+          content_type: "note",
           title: null,
           body: textValue.trim(),
           file_path: null,
@@ -221,7 +221,7 @@ export default function SubmissionForm({
       if (thought.trim()) {
         submissions.push({
           profile_id: selectedProfileId,
-          content_type: "thought",
+          content_type: "idea",
           title: title.trim() ? `On: ${title.trim()}` : null,
           body: thought.trim(),
           file_path: null,
