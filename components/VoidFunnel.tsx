@@ -104,8 +104,8 @@ void main(){
         float tRay = saw * saw * (3.0 - 2.0 * saw);
         vec3 spectral = 2.0 * sampleGradient(tRay);
 
-        // Smooth radial falloff — no hard circle cutoff
-        float radFade = 1.0 / (1.0 + rad * rad * 0.15);
+        // Center is black (the abyss), light emerges from mid-range, fades at edges
+        float radFade = smoothstep(0.3, 2.5, rad) / (1.0 + rad * rad * 0.06);
 
         vec3 base = (0.04 / (0.5 + stepLen))
                   * radFade
@@ -150,8 +150,8 @@ export default function VoidFunnel() {
     gl.canvas.style.height = "100%";
     container.appendChild(gl.canvas as HTMLCanvasElement);
 
-    // Cool steel-blue tones — bright enough to see the animation
-    const colors = ["#4a6a80", "#3a5570", "#5580a0"];
+    // Very dark deep tones — void/abyss feel
+    const colors = ["#111a22", "#0c1218", "#111a22"];
     const colorCount = colors.length;
     const data = new Uint8Array(colorCount * 4);
     for (let i = 0; i < colorCount; i++) {
@@ -176,8 +176,8 @@ export default function VoidFunnel() {
       uniforms: {
         uResolution: { value: [1, 1] },
         uTime: { value: 0 },
-        uIntensity: { value: 2.5 },
-        uSpeed: { value: 0.08 },
+        uIntensity: { value: 3.0 },
+        uSpeed: { value: 0.15 },
         uOffset: { value: [0, 0] },
         uGradient: { value: gradientTex },
         uColorCount: { value: colorCount },

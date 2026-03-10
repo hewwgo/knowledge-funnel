@@ -20,6 +20,7 @@ interface Profile {
 }
 
 type FormState = "landing" | "uploading" | "editing" | "sucking" | "profile";
+type InputMode = "pdf" | "url" | "text";
 
 export default function SubmissionForm({
   onSubmitted,
@@ -40,6 +41,9 @@ export default function SubmissionForm({
   const [submitting, setSubmitting] = useState(false);
   const [formState, setFormState] = useState<FormState>("landing");
   const [showThought, setShowThought] = useState(false);
+  const [inputMode, setInputMode] = useState<InputMode>("pdf");
+  const [urlValue, setUrlValue] = useState("");
+  const [textValue, setTextValue] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -120,8 +124,64 @@ export default function SubmissionForm({
     setKeywords([]);
     setThought("");
     setShowThought(false);
+    setUrlValue("");
+    setTextValue("");
     setFormState("landing");
     if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleUrlSubmit = async () => {
+    if (!urlValue.trim() || !selectedProfileId) return;
+    setSubmitting(true);
+    setFormState("sucking");
+    await new Promise((r) => setTimeout(r, 600));
+    try {
+      await fetch("/api/submissions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          profile_id: selectedProfileId,
+          content_type: "url",
+          title: urlValue.trim(),
+          body: urlValue.trim(),
+          file_path: null,
+        }),
+      });
+      clearAll();
+      onSubmitted();
+    } catch (err) {
+      console.error("URL submission failed:", err);
+      setFormState("landing");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleTextSubmit = async () => {
+    if (!textValue.trim() || !selectedProfileId) return;
+    setSubmitting(true);
+    setFormState("sucking");
+    await new Promise((r) => setTimeout(r, 600));
+    try {
+      await fetch("/api/submissions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          profile_id: selectedProfileId,
+          content_type: "thought",
+          title: null,
+          body: textValue.trim(),
+          file_path: null,
+        }),
+      });
+      clearAll();
+      onSubmitted();
+    } catch (err) {
+      console.error("Text submission failed:", err);
+      setFormState("landing");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -223,20 +283,95 @@ export default function SubmissionForm({
     );
   }
 
-  // Landing state: just the drop zone
+  // Landing state: tabs + content
   if (formState === "landing") {
     return (
       <div className="center-form">
         {fileInput}
-        <div className="drop-zone">
-          <p className="drop-zone-text">Drop a PDF</p>
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="drop-zone-browse"
-          >
-            or browse
-          </button>
+        <div className="landing-box">
+          <div className="input-tabs">
+            <button
+              type="button"
+              className={`input-tab${inputMode === "pdf" ? " input-tab-active" : ""}`}
+              onClick={() => setInputMode("pdf")}
+            >
+              PDF
+            </button>
+            <button
+              type="button"
+              className={`input-tab${inputMode === "url" ? " input-tab-active" : ""}`}
+              onClick={() => setInputMode("url")}
+            >
+              URL
+            </button>
+            <button
+              type="button"
+              className={`input-tab${inputMode === "text" ? " input-tab-active" : ""}`}
+              onClick={() => setInputMode("text")}
+            >
+              Text
+            </button>
+          </div>
+
+          <div className="input-tab-content">
+            {inputMode === "pdf" && (
+              <div className="drop-zone">
+                <p className="drop-zone-text">Drop a PDF here</p>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="drop-zone-browse"
+                >
+                  or browse
+                </button>
+              </div>
+            )}
+
+            {inputMode === "url" && (
+              <div className="url-input-zone">
+                <input
+                  type="url"
+                  value={urlValue}
+                  onChange={(e) => setUrlValue(e.target.value)}
+                  placeholder="Paste a link..."
+                  className="url-input"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleUrlSubmit();
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={handleUrlSubmit}
+                  disabled={!urlValue.trim() || submitting}
+                  className="submit-btn-small"
+                >
+                  Drop it in
+                </button>
+              </div>
+            )}
+
+            {inputMode === "text" && (
+              <div className="text-input-zone">
+                <textarea
+                  value={textValue}
+                  onChange={(e) => setTextValue(e.target.value)}
+                  placeholder="Share a thought, idea, or note..."
+                  className="text-input"
+                  rows={3}
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={handleTextSubmit}
+                  disabled={!textValue.trim() || submitting}
+                  className="submit-btn-small"
+                >
+                  Drop it in
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );
