@@ -8,7 +8,7 @@ interface VoidFunnelProps {
 export default function VoidFunnel({ dragging = false }: VoidFunnelProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number>(0);
-  const dragVal = useRef(0); // 0 = idle, 1 = dragging (lerped)
+  const dragVal = useRef(0);
   const dragTarget = useRef(0);
 
   useEffect(() => {
@@ -40,7 +40,7 @@ export default function VoidFunnel({ dragging = false }: VoidFunnelProps) {
 
     function draw(time: number) {
       if (!ctx) return;
-      // Smooth drag interpolation
+
       dragVal.current += (dragTarget.current - dragVal.current) * 0.04;
       const d = dragVal.current;
 
@@ -48,77 +48,83 @@ export default function VoidFunnel({ dragging = false }: VoidFunnelProps) {
       ctx.fillStyle = "#ebebeb";
       ctx.fillRect(0, 0, W, H);
 
-      // Funnel center
-      const cx = W * 0.5;
-      const cy = H * 0.5;
+      // Hole position — slightly right & above center like the reference
+      const cx = W * 0.53;
+      const cy = H * 0.46;
 
-      // Geometry
       const viewSize = Math.max(W, H);
-      const outerR = viewSize * 0.85;
-      const funnelR = viewSize * 0.21;
-      const holeR = 12;
-      const depth = 420 + d * 180; // pulls deeper when dragging
+      const outerR = viewSize * 0.92;
+
+      // Torus parameters
+      // majorR = distance from wormhole center to tube center
+      // minorR = radius of the tube cross-section
+      const majorR = viewSize * 0.18;
+      const minorR = majorR * 0.55 + d * majorR * 0.1;
+      const rimR = majorR + minorR; // where tube meets flat surface
 
       // Camera
-      const focalLen = 620;
-      const tilt = 0.28 + d * 0.15; // tilts more into hole when dragging
-      const cosA = Math.cos(tilt);
-      const sinA = Math.sin(tilt);
+      const focalLen = 560;
+      const tilt = 0.40 + d * 0.12; // radians — look into the hole
+      const cosT = Math.cos(tilt);
+      const sinT = Math.sin(tilt);
 
-      // Very slow rotation (~1 full turn per 10 min)
+      // Very slow rotation
       const rot = time * 0.0000105;
 
-      function project(r: number, theta: number): [number, number] {
-        let sr = r;
-        let sz = 0;
-
-        if (r < funnelR) {
-          const t = r / funnelR; // 0 at center, 1 at rim
-          sr = holeR + (funnelR - holeR) * Math.pow(t, 0.55);
-          sz = depth * Math.pow(1 - t, 2.0);
-        }
-
-        const x3 = sr * Math.cos(theta + rot);
-        const y3 = sr * Math.sin(theta + rot);
-        const z3 = sz;
-
-        // Tilt camera (rotate around X)
-        const yt = y3 * cosA - z3 * sinA;
-        const zt = y3 * sinA + z3 * cosA;
-
-        // Perspective
+      // 3D → 2D projection (tilt around X axis + perspective)
+      function proj(x3: number, y3: number, z3: number): [number, number] {
+        const yt = y3 * cosT - z3 * sinT;
+        const zt = y3 * sinT + z3 * cosT;
         const s = focalLen / (focalLen + zt);
         return [cx + x3 * s, cy + yt * s];
       }
 
-      const RINGS = 65;
-      const RADIALS = 60;
-      const ARC_RES = 200;
-      const LINE_RES = 90;
+      // Point on the flat grid surface at radius r
+      function flatPt(r: number, theta: number): [number, number] {
+        return proj(
+          r * Math.cos(theta + rot),
+          r * Math.sin(theta + rot),
+          0
+        );
+      }
 
-      // --- Concentric rings ---
-      for (let i = 1; i <= RINGS; i++) {
-        const r = (i / RINGS) * outerR;
+      // Point on the torus tube surface at angle phi around the tube
+      // phi=0 → outer rim (meets flat surface), phi→pi → inner back wall
+      function tubePt(phi: number, theta: number): [number, number] {
+        const r = majorR + minorR * Math.cos(phi);
+        const z = minorR * Math.sin(phi);
+        return proj(
+          r * Math.cos(theta + rot),
+          r * Math.sin(theta + rot),
+          z
+        );
+      }
 
-        // Opacity: fade at far edges, strengthen inside funnel
-        let alpha: number;
-        if (r > viewSize * 0.55) {
-          alpha = 0.08 * Math.max(0, 1 - (r - viewSize * 0.55) / (viewSize * 0.32));
-        } else if (r < funnelR) {
-          alpha = 0.07 + 0.18 * Math.pow(1 - r / funnelR, 0.6);
-        } else {
-          alpha = 0.08;
+      // Grid density
+      const FLAT_RINGS = 42;
+      const TUBE_RINGS = 38;
+      const RADIALS = 80;
+      const ARC = 240;
+      const maxPhi = Math.PI * 0.88; // how far around inside the tube we render
+
+      // ── Flat surface: concentric rings ──
+      for (let i = 0; i <= FLAT_RINGS; i++) {
+        const t = i / FLAT_RINGS;
+        const r = rimR + (outerR - rimR) * t;
+
+        // Fade at far edges
+        let alpha = 0.10;
+        if (t > 0.65) {
+          alpha = 0.10 * Math.max(0, 1 - (t - 0.65) / 0.35);
         }
-
         if (alpha < 0.005) continue;
 
-        ctx.strokeStyle = `rgba(30, 30, 30, ${alpha})`;
-        ctx.lineWidth = r < funnelR * 0.25 ? 0.9 : r < funnelR ? 0.6 : 0.4;
+        ctx.strokeStyle = `rgba(50, 50, 50, ${alpha.toFixed(3)})`;
+        ctx.lineWidth = 0.5;
         ctx.beginPath();
-
-        for (let j = 0; j <= ARC_RES; j++) {
-          const theta = (j / ARC_RES) * Math.PI * 2;
-          const [x, y] = project(r, theta);
+        for (let j = 0; j <= ARC; j++) {
+          const theta = (j / ARC) * Math.PI * 2;
+          const [x, y] = flatPt(r, theta);
           if (j === 0) ctx.moveTo(x, y);
           else ctx.lineTo(x, y);
         }
@@ -126,20 +132,51 @@ export default function VoidFunnel({ dragging = false }: VoidFunnelProps) {
         ctx.stroke();
       }
 
-      // --- Radial lines ---
+      // ── Tube surface: rings at each phi depth ──
+      for (let i = 0; i <= TUBE_RINGS; i++) {
+        const phi = (i / TUBE_RINGS) * maxPhi;
+        const depth = phi / maxPhi; // 0 at rim → 1 at deepest
+
+        // Lines get darker deeper inside the tube
+        const alpha = 0.06 + 0.22 * depth;
+        ctx.strokeStyle = `rgba(40, 40, 40, ${alpha.toFixed(3)})`;
+        ctx.lineWidth = 0.4 + 0.5 * depth;
+        ctx.beginPath();
+        for (let j = 0; j <= ARC; j++) {
+          const theta = (j / ARC) * Math.PI * 2;
+          const [x, y] = tubePt(phi, theta);
+          if (j === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.stroke();
+      }
+
+      // ── Radial lines (flat surface → into tube) ──
       for (let j = 0; j < RADIALS; j++) {
         const theta = (j / RADIALS) * Math.PI * 2;
 
-        ctx.strokeStyle = "rgba(30, 30, 30, 0.06)";
+        ctx.strokeStyle = "rgba(50, 50, 50, 0.07)";
         ctx.lineWidth = 0.4;
         ctx.beginPath();
 
-        for (let i = 0; i <= LINE_RES; i++) {
-          const r = (i / LINE_RES) * outerR;
-          const [x, y] = project(r, theta);
-          if (i === 0) ctx.moveTo(x, y);
+        // Flat part: from outer edge inward to rim
+        let first = true;
+        for (let i = FLAT_RINGS; i >= 0; i--) {
+          const t = i / FLAT_RINGS;
+          const r = rimR + (outerR - rimR) * t;
+          const [x, y] = flatPt(r, theta);
+          if (first) { ctx.moveTo(x, y); first = false; }
           else ctx.lineTo(x, y);
         }
+
+        // Tube part: continue from rim into the tube
+        for (let i = 0; i <= TUBE_RINGS; i++) {
+          const phi = (i / TUBE_RINGS) * maxPhi;
+          const [x, y] = tubePt(phi, theta);
+          ctx.lineTo(x, y);
+        }
+
         ctx.stroke();
       }
 
