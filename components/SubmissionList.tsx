@@ -59,6 +59,16 @@ export default function SubmissionList({
 }) {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  const toggleExpand = (id: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   useEffect(() => {
     const profileId = localStorage.getItem("funnel_profile_id");
@@ -120,31 +130,36 @@ export default function SubmissionList({
                   </span>
                 </div>
               )}
-              {/* Note/Idea rows — indented */}
-              {group.children.map((child) => (
-                <div
-                  key={child.id}
-                  className={`submission-item submission-child${!group.paper ? " submission-standalone" : ""}`}
-                >
-                  <span className="submission-type">
-                    {child.content_type === "idea" ? "Idea" : "Note"}
-                  </span>
-                  <span className="submission-text">
-                    {child.body.slice(0, 80)}
-                    {child.body.length > 80 ? "..." : ""}
-                  </span>
-                  {!group.paper && (
-                    <span className="submission-time">
-                      {new Date(child.created_at).toLocaleDateString("en-GB", {
-                        day: "numeric",
-                        month: "short",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+              {/* Note/Idea rows — indented, expandable */}
+              {group.children.map((child) => {
+                const isExpanded = expanded.has(child.id);
+                const isLong = child.body.length > 80;
+                return (
+                  <div
+                    key={child.id}
+                    className={`submission-item submission-child${!group.paper ? " submission-standalone" : ""}${isLong ? " submission-expandable" : ""}`}
+                    onClick={() => isLong && toggleExpand(child.id)}
+                  >
+                    <span className="submission-type">
+                      {child.content_type === "idea" ? "Idea" : "Note"}
                     </span>
-                  )}
-                </div>
-              ))}
+                    <span className={`submission-text${isExpanded ? " submission-text-expanded" : ""}`}>
+                      {isExpanded ? child.body : child.body.slice(0, 80)}
+                      {!isExpanded && isLong ? "..." : ""}
+                    </span>
+                    {!group.paper && (
+                      <span className="submission-time">
+                        {new Date(child.created_at).toLocaleDateString("en-GB", {
+                          day: "numeric",
+                          month: "short",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
             </li>
           ))}
         </ul>

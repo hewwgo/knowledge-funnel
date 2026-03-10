@@ -323,6 +323,19 @@ body {
   color: #666666;
 }
 
+.submission-expandable {
+  cursor: pointer;
+}
+
+.submission-expandable:hover .submission-text {
+  color: #262624;
+}
+
+.submission-text-expanded {
+  white-space: normal;
+  line-height: 1.5;
+}
+
 .submission-standalone {
   padding-left: 0;
 }
