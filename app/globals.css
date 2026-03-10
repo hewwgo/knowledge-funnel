@@ -197,6 +197,26 @@ body {
   padding: 0;
 }
 
+/* === Keywords === */
+
+.keywords-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 20px;
+}
+
+.keyword-tag {
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 4px 10px;
+  border: 1.5px solid #d4a574;
+  color: #c07830;
+  background: #ffffff;
+}
+
 /* === Browse link === */
 
 .browse-link {

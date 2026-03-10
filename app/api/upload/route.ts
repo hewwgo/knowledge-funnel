@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { extractText } from "unpdf";
+import { extractPaperMetadata } from "@/lib/llm";
 
 export async function POST(request: NextRequest) {
   const formData = await request.formData();
@@ -32,29 +33,47 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: uploadError.message }, { status: 500 });
   }
 
-  // Extract text from PDF
-  let extractedText = "";
-  let extractedTitle = "";
+  // Extract raw text from PDF
+  let rawText = "";
   try {
     const { text } = await extractText(buffer);
-    extractedText = Array.isArray(text) ? text.join("\n") : (text || "");
+    rawText = Array.isArray(text) ? text.join("\n") : (text || "");
+  } catch (err) {
+    console.error("PDF text extraction failed:", err);
+  }
 
-    // Use first non-empty line as title guess
-    const lines = extractedText
+  // Use LLM to extract structured metadata
+  let title = "";
+  let abstract = "";
+  let keywords: string[] = [];
+
+  if (rawText.length > 50) {
+    try {
+      const metadata = await extractPaperMetadata(rawText);
+      title = metadata.title;
+      abstract = metadata.abstract;
+      keywords = metadata.keywords;
+    } catch (err) {
+      console.error("LLM extraction failed:", err);
+    }
+  }
+
+  // Fallback: use first line as title if LLM didn't return one
+  if (!title) {
+    const lines = rawText
       .split("\n")
       .map((l: string) => l.trim())
       .filter((l: string) => l.length > 3);
     if (lines.length > 0) {
-      extractedTitle = lines[0].slice(0, 200);
+      title = lines[0].slice(0, 200);
     }
-  } catch (err) {
-    console.error("PDF text extraction failed:", err);
   }
 
   return NextResponse.json({
     file_path: fileName,
     file_name: file.name,
-    extracted_title: extractedTitle,
-    extracted_text: extractedText,
+    title,
+    abstract,
+    keywords,
   });
 }

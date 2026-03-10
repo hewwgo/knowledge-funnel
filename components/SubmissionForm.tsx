@@ -31,6 +31,7 @@ export default function SubmissionForm({
   const [contentType, setContentType] = useState<ContentType>("paper");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [keywords, setKeywords] = useState<string[]>([]);
   const [filePath, setFilePath] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -77,12 +78,9 @@ export default function SubmissionForm({
         const data = await res.json();
         setFilePath(data.file_path);
         setFileName(data.file_name);
-        if (data.extracted_title) {
-          setTitle(data.extracted_title);
-        }
-        if (data.extracted_text) {
-          setBody(data.extracted_text.slice(0, 8000));
-        }
+        if (data.title) setTitle(data.title);
+        if (data.abstract) setBody(data.abstract);
+        if (data.keywords) setKeywords(data.keywords);
       }
     } catch (err) {
       console.error("Upload failed:", err);
@@ -109,6 +107,7 @@ export default function SubmissionForm({
     setFileName(null);
     setTitle("");
     setBody("");
+    setKeywords([]);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -118,6 +117,12 @@ export default function SubmissionForm({
 
     setSubmitting(true);
 
+    // For papers with keywords, append them to the body for the agents
+    let submissionBody = body.trim();
+    if (contentType === "paper" && keywords.length > 0) {
+      submissionBody += `\n\nKeywords: ${keywords.join(", ")}`;
+    }
+
     try {
       const res = await fetch("/api/submissions", {
         method: "POST",
@@ -126,7 +131,7 @@ export default function SubmissionForm({
           profile_id: selectedProfileId,
           content_type: contentType,
           title: title.trim() || null,
-          body: body.trim(),
+          body: submissionBody,
           file_path: filePath,
         }),
       });
@@ -134,6 +139,7 @@ export default function SubmissionForm({
       if (res.ok) {
         setTitle("");
         setBody("");
+        setKeywords([]);
         setFilePath(null);
         setFileName(null);
         if (fileInputRef.current) fileInputRef.current.value = "";
@@ -171,18 +177,38 @@ export default function SubmissionForm({
 
   return (
     <div className="submission-form-wrapper">
-      {/* Upload status / file info */}
+      {/* Upload status */}
       {uploading && (
-        <div className="upload-status">Extracting content from PDF...</div>
+        <div className="upload-status">
+          Uploading &amp; extracting metadata...
+        </div>
       )}
 
+      {/* File banner with extracted info */}
       {fileName && !uploading && (
-        <div className="file-banner">
-          <span className="file-banner-name">{fileName}</span>
-          <button type="button" onClick={clearFile} className="file-banner-clear">
-            remove
-          </button>
-        </div>
+        <>
+          <div className="file-banner">
+            <span className="file-banner-name">{fileName}</span>
+            <button
+              type="button"
+              onClick={clearFile}
+              className="file-banner-clear"
+            >
+              remove
+            </button>
+          </div>
+
+          {/* Keywords display */}
+          {keywords.length > 0 && (
+            <div className="keywords-row">
+              {keywords.map((kw, i) => (
+                <span key={i} className="keyword-tag">
+                  {kw}
+                </span>
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {/* Hidden file input for click-to-browse fallback */}
@@ -209,6 +235,7 @@ export default function SubmissionForm({
                   if (!filePath) {
                     setTitle("");
                     setBody("");
+                    setKeywords([]);
                   }
                 }}
               >
@@ -220,6 +247,7 @@ export default function SubmissionForm({
 
         {/* Title */}
         <div style={{ marginBottom: "20px" }}>
+          <label className="form-label">Title</label>
           <input
             type="text"
             value={title}
@@ -229,20 +257,23 @@ export default function SubmissionForm({
           />
         </div>
 
-        {/* Content */}
+        {/* Content / Abstract */}
         <div style={{ marginBottom: "20px" }}>
+          <label className="form-label">
+            {filePath ? "Abstract" : "Content"}
+          </label>
           <textarea
             value={body}
             onChange={(e) => setBody(e.target.value)}
             placeholder={PLACEHOLDERS[contentType]}
             className="form-textarea"
-            rows={filePath ? 8 : 4}
+            rows={filePath ? 6 : 4}
             required
           />
         </div>
 
         {/* Browse PDF link — only for paper type when no file yet */}
-        {contentType === "paper" && !filePath && (
+        {contentType === "paper" && !filePath && !uploading && (
           <div style={{ marginBottom: "20px" }}>
             <button
               type="button"

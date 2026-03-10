@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import FunnelStatus from "@/components/FunnelStatus";
 import SubmissionForm from "@/components/SubmissionForm";
 import SubmissionList from "@/components/SubmissionList";
@@ -10,61 +10,62 @@ export default function Home() {
   const [selectedName, setSelectedName] = useState<string>("");
   const [droppedFile, setDroppedFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const dragCounter = useRef(0);
 
   useEffect(() => {
     const name = localStorage.getItem("funnel_profile_name");
     if (name) setSelectedName(name);
-
-    const handleStorage = () => {
-      const updated = localStorage.getItem("funnel_profile_name");
-      setSelectedName(updated || "");
-    };
-
-    window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
   }, []);
 
-  // Prevent browser default drop behavior globally
+  // All drag/drop handling at the window level to prevent browser default
   useEffect(() => {
-    const preventDefaults = (e: DragEvent) => {
+    const handleDragEnter = (e: DragEvent) => {
       e.preventDefault();
-      e.stopPropagation();
+      dragCounter.current++;
+      if (e.dataTransfer?.types.includes("Files")) {
+        setDragOver(true);
+      }
     };
-    window.addEventListener("dragover", preventDefaults);
-    window.addEventListener("drop", preventDefaults);
-    return () => {
-      window.removeEventListener("dragover", preventDefaults);
-      window.removeEventListener("drop", preventDefaults);
+
+    const handleDragLeave = (e: DragEvent) => {
+      e.preventDefault();
+      dragCounter.current--;
+      if (dragCounter.current === 0) {
+        setDragOver(false);
+      }
     };
-  }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(false);
-    const file = e.dataTransfer.files[0];
-    if (file && file.name.toLowerCase().endsWith(".pdf")) {
-      setDroppedFile(file);
-    }
-  }, []);
+    const handleDragOver = (e: DragEvent) => {
+      e.preventDefault();
+    };
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    // Only set false if actually leaving the page container
-    if (e.currentTarget === e.target || !e.currentTarget.contains(e.relatedTarget as Node)) {
+    const handleDrop = (e: DragEvent) => {
+      e.preventDefault();
+      dragCounter.current = 0;
       setDragOver(false);
-    }
+      const file = e.dataTransfer?.files[0];
+      if (file && file.name.toLowerCase().endsWith(".pdf")) {
+        setDroppedFile(file);
+      }
+    };
+
+    window.addEventListener("dragenter", handleDragEnter);
+    window.addEventListener("dragleave", handleDragLeave);
+    window.addEventListener("dragover", handleDragOver);
+    window.addEventListener("drop", handleDrop);
+    return () => {
+      window.removeEventListener("dragenter", handleDragEnter);
+      window.removeEventListener("dragleave", handleDragLeave);
+      window.removeEventListener("dragover", handleDragOver);
+      window.removeEventListener("drop", handleDrop);
+    };
   }, []);
 
-  const handleSubmitted = () => {
+  const handleSubmitted = useCallback(() => {
     setRefreshKey((k) => k + 1);
     const name = localStorage.getItem("funnel_profile_name");
     if (name) setSelectedName(name);
-  };
+  }, []);
 
   const handleChangeName = () => {
     localStorage.removeItem("funnel_profile_id");
@@ -73,17 +74,12 @@ export default function Home() {
     setRefreshKey((k) => k + 1);
   };
 
-  const handleFileConsumed = () => {
+  const handleFileConsumed = useCallback(() => {
     setDroppedFile(null);
-  };
+  }, []);
 
   return (
-    <div
-      onDrop={handleDrop}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      style={{ minHeight: "100vh", position: "relative" }}
-    >
+    <div style={{ minHeight: "100vh", position: "relative" }}>
       {/* Full-page drag overlay */}
       {dragOver && (
         <div className="drag-overlay">
