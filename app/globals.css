@@ -290,13 +290,41 @@ body {
   list-style: none;
 }
 
+.submission-group {
+  padding: 0;
+  margin-bottom: 4px;
+  border-bottom: 1px solid #eee;
+}
+
 .submission-item {
   display: flex;
   align-items: baseline;
   gap: 12px;
   padding: 10px 0;
-  border-bottom: 1px solid #eee;
   font-size: 14px;
+}
+
+.submission-paper {
+  padding: 12px 0;
+}
+
+.submission-paper-title {
+  font-weight: 500;
+  white-space: normal;
+  line-height: 1.4;
+}
+
+.submission-child {
+  padding: 6px 0 6px 60px;
+}
+
+.submission-child .submission-text {
+  font-size: 13px;
+  color: #666666;
+}
+
+.submission-standalone {
+  padding-left: 0;
 }
 
 .submission-type {
