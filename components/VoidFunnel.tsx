@@ -150,8 +150,8 @@ export default function VoidFunnel() {
     gl.canvas.style.height = "100%";
     container.appendChild(gl.canvas as HTMLCanvasElement);
 
-    // Muted cool tones
-    const colors = ["#2a3845", "#1e2d3a", "#2a3845"];
+    // Cool steel-blue tones — bright enough to see the animation
+    const colors = ["#4a6a80", "#3a5570", "#5580a0"];
     const colorCount = colors.length;
     const data = new Uint8Array(colorCount * 4);
     for (let i = 0; i < colorCount; i++) {
@@ -176,8 +176,8 @@ export default function VoidFunnel() {
       uniforms: {
         uResolution: { value: [1, 1] },
         uTime: { value: 0 },
-        uIntensity: { value: 1.8 },
-        uSpeed: { value: 0.06 },
+        uIntensity: { value: 2.5 },
+        uSpeed: { value: 0.08 },
         uOffset: { value: [0, 0] },
         uGradient: { value: gradientTex },
         uColorCount: { value: colorCount },
