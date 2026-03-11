@@ -34,13 +34,32 @@ export async function handleSubmitLink(
   }
 
   try {
+    const displayName =
+      interaction.member && "displayName" in interaction.member
+        ? (interaction.member.displayName as string)
+        : interaction.user.displayName || interaction.user.username;
+
     const profileId = await findOrCreateProfile(
       interaction.user.id,
-      interaction.user.displayName || interaction.user.username
+      displayName
     );
 
-    // Fetch and extract metadata
-    const metadata = await fetchAndExtractUrl(url);
+    // Fetch and extract metadata (graceful fallback if site blocks us)
+    let metadata = { title: "", abstract: "", keywords: [] as string[] };
+    let fetchWarning = "";
+    try {
+      metadata = await fetchAndExtractUrl(url);
+    } catch (err: any) {
+      const msg = err?.message || String(err);
+      if (msg.includes("403")) {
+        fetchWarning = "⚠️ This site blocked automated access (403 Forbidden). No content could be extracted. Try dropping the PDF directly, or use `/submit-note` to describe it in your own words.";
+      } else if (msg.includes("404")) {
+        fetchWarning = "⚠️ Page not found (404). Double-check the URL is correct and try again.";
+      } else {
+        fetchWarning = `⚠️ Could not fetch page content. Try dropping a PDF or using \`/submit-note\` instead. Error: ${msg.slice(0, 200)}`;
+      }
+      console.warn(`Could not fetch URL metadata (${url}):`, err);
+    }
 
     // Build body (same format as web UI)
     const parts: string[] = [];
@@ -66,6 +85,17 @@ export async function handleSubmitLink(
       .setFooter({ text: `Submission ${submission.id.slice(0, 8)}` })
       .setTimestamp();
 
+    embed.addFields({
+      name: "Submitted by",
+      value: displayName,
+      inline: true,
+    });
+    if (comment) {
+      embed.addFields({
+        name: "Your Comment",
+        value: comment.slice(0, 1024),
+      });
+    }
     if (metadata.abstract) {
       embed.addFields({
         name: "Summary",
@@ -76,6 +106,12 @@ export async function handleSubmitLink(
       embed.addFields({
         name: "Keywords",
         value: metadata.keywords.join(", "),
+      });
+    }
+    if (fetchWarning) {
+      embed.addFields({
+        name: "Note",
+        value: fetchWarning,
       });
     }
 
@@ -99,9 +135,14 @@ export async function handleSubmitNote(
     | "idea";
 
   try {
+    const displayName =
+      interaction.member && "displayName" in interaction.member
+        ? (interaction.member.displayName as string)
+        : interaction.user.displayName || interaction.user.username;
+
     const profileId = await findOrCreateProfile(
       interaction.user.id,
-      interaction.user.displayName || interaction.user.username
+      displayName
     );
 
     // Use first line or first 100 chars as title
@@ -120,6 +161,12 @@ export async function handleSubmitNote(
       .setDescription(text.slice(0, 2048))
       .setFooter({ text: `Submission ${submission.id.slice(0, 8)}` })
       .setTimestamp();
+
+    embed.addFields({
+      name: "Submitted by",
+      value: displayName,
+      inline: true,
+    });
 
     await interaction.editReply({ embeds: [embed] });
   } catch (err) {
@@ -171,9 +218,14 @@ export async function handleMySubmissions(
   await interaction.deferReply();
 
   try {
+    const displayName =
+      interaction.member && "displayName" in interaction.member
+        ? (interaction.member.displayName as string)
+        : interaction.user.displayName || interaction.user.username;
+
     const profileId = await findOrCreateProfile(
       interaction.user.id,
-      interaction.user.displayName || interaction.user.username
+      displayName
     );
 
     const supabase = getSupabase();
@@ -241,12 +293,15 @@ export async function handlePdfAttachment(
   const channelId = process.env.DISCORD_CHANNEL_ID;
   if (channelId && message.channelId !== channelId) return;
 
-  await message.reply("Processing your PDF...");
+  const processingMsg = await message.reply("Processing your PDF...");
 
   try {
+    const displayName =
+      message.member?.displayName || message.author.displayName || message.author.username;
+
     const profileId = await findOrCreateProfile(
       message.author.id,
-      message.author.displayName || message.author.username
+      displayName
     );
 
     // Download the PDF
@@ -296,6 +351,8 @@ export async function handlePdfAttachment(
 
     // Build body
     const parts: string[] = [];
+    const userComment = message.content?.trim();
+    if (userComment) parts.push(`Comment: ${userComment}`);
     if (abstract) parts.push(abstract);
     if (keywords.length > 0) parts.push(`Keywords: ${keywords.join(", ")}`);
     parts.push(`File: ${fileName}`);
@@ -315,6 +372,17 @@ export async function handlePdfAttachment(
       .setFooter({ text: `Submission ${submission.id.slice(0, 8)}` })
       .setTimestamp();
 
+    embed.addFields({
+      name: "Submitted by",
+      value: displayName,
+      inline: true,
+    });
+    if (userComment) {
+      embed.addFields({
+        name: "Your Comment",
+        value: userComment.slice(0, 1024),
+      });
+    }
     if (abstract) {
       embed.addFields({
         name: "Abstract",
@@ -328,9 +396,11 @@ export async function handlePdfAttachment(
       });
     }
 
+    await processingMsg.delete().catch(() => {});
     await message.reply({ embeds: [embed] });
   } catch (err) {
     console.error("PDF handler error:", err);
+    await processingMsg.delete().catch(() => {});
     await message.reply(
       "Something went wrong processing that PDF. Please try again."
     );

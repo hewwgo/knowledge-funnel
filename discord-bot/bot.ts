@@ -1,5 +1,7 @@
 import "dotenv/config";
 import { Client, GatewayIntentBits, Events } from "discord.js";
+import { existsSync, writeFileSync, unlinkSync, readFileSync } from "fs";
+import { resolve } from "path";
 import {
   handleSubmitLink,
   handleSubmitNote,
@@ -7,6 +9,38 @@ import {
   handleMySubmissions,
   handlePdfAttachment,
 } from "./handlers.js";
+
+// --- Single-instance guard (PID file) ---
+
+const PID_FILE = resolve(import.meta.dirname ?? ".", "bot.pid");
+
+function acquireLock() {
+  if (existsSync(PID_FILE)) {
+    const oldPid = parseInt(readFileSync(PID_FILE, "utf-8").trim(), 10);
+    // Check if that process is still alive
+    try {
+      process.kill(oldPid, 0); // signal 0 = just check existence
+      console.error(
+        `Another bot instance is already running (PID ${oldPid}). Kill it first or delete ${PID_FILE}.`
+      );
+      process.exit(1);
+    } catch {
+      // Process is dead — stale PID file, safe to overwrite
+      console.log(`Removing stale PID file (old PID ${oldPid}).`);
+    }
+  }
+  writeFileSync(PID_FILE, String(process.pid), "utf-8");
+}
+
+function releaseLock() {
+  try {
+    if (existsSync(PID_FILE)) unlinkSync(PID_FILE);
+  } catch {}
+}
+
+acquireLock();
+
+// --- Discord Client ---
 
 const client = new Client({
   intents: [
@@ -17,7 +51,7 @@ const client = new Client({
 });
 
 client.once(Events.ClientReady, (c) => {
-  console.log(`Bot online as ${c.user.tag}`);
+  console.log(`Bot online as ${c.user.tag} (PID ${process.pid})`);
 
   const channelId = process.env.DISCORD_CHANNEL_ID;
   if (channelId) {
@@ -80,6 +114,19 @@ client.on(Events.MessageCreate, async (message) => {
     await handlePdfAttachment(message, pdfAttachment);
   }
 });
+
+// --- Graceful Shutdown ---
+
+async function shutdown(signal: string) {
+  console.log(`\n${signal} received — shutting down...`);
+  client.destroy();
+  releaseLock();
+  process.exit(0);
+}
+
+process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("exit", releaseLock);
 
 // --- Start ---
 
