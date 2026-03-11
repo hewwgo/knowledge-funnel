@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { Client, GatewayIntentBits, Events } from "discord.js";
+import { Client, GatewayIntentBits, Events, ChannelType, Partials } from "discord.js";
 import { existsSync, writeFileSync, unlinkSync, readFileSync } from "fs";
 import { resolve } from "path";
 import {
@@ -8,6 +8,7 @@ import {
   handleFunnelStatus,
   handleMySubmissions,
   handlePdfAttachment,
+  handleMention,
 } from "./handlers.js";
 
 // --- Single-instance guard (PID file) ---
@@ -47,7 +48,9 @@ const client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
+    GatewayIntentBits.DirectMessages,
   ],
+  partials: [Partials.Channel],
 });
 
 client.once(Events.ClientReady, (c) => {
@@ -104,6 +107,37 @@ client.on(Events.MessageCreate, async (message) => {
   // Keep set from growing forever
   if (processedMessages.size > 1000) processedMessages.clear();
 
+  const channelId = process.env.DISCORD_CHANNEL_ID;
+  const isDM = message.channel.type === ChannelType.DM;
+  const isTargetChannel = channelId && message.channelId === channelId;
+
+  // --- DM handling: submissions + chat ---
+  if (isDM) {
+    const pdfAttachment = message.attachments.find(
+      (a) =>
+        a.name?.toLowerCase().endsWith(".pdf") ||
+        a.contentType === "application/pdf"
+    );
+
+    if (pdfAttachment) {
+      await handlePdfAttachment(message, pdfAttachment);
+    } else if (message.content.trim()) {
+      // In DMs, treat plain text as a chat question
+      await handleMention(message, true);
+    }
+    return;
+  }
+
+  // --- Channel handling ---
+  if (!isTargetChannel) return;
+
+  // Check if bot was mentioned (chat mode)
+  if (client.user && message.mentions.has(client.user)) {
+    await handleMention(message);
+    return;
+  }
+
+  // PDF detection
   const pdfAttachment = message.attachments.find(
     (a) =>
       a.name?.toLowerCase().endsWith(".pdf") ||

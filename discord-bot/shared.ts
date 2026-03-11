@@ -29,10 +29,18 @@ function getLLM(): OpenAI {
   return _llm;
 }
 
+export type Metadata = {
+  title: string;
+  authors: string;
+  year: number | null;
+  abstract: string;
+  keywords: string[];
+};
+
 export async function extractUrlMetadata(
   pageText: string,
   url: string
-): Promise<{ title: string; abstract: string; keywords: string[] }> {
+): Promise<Metadata> {
   const truncated = pageText.slice(0, 6000);
 
   const response = await getLLM().chat.completions.create({
@@ -45,12 +53,15 @@ export async function extractUrlMetadata(
       },
       {
         role: "user",
-        content: `Extract the title, a concise summary (as "abstract"), and 3-5 keywords from this web page content.
+        content: `Extract the title, authors, publication year, a concise summary (as "abstract"), and 3-5 keywords from this web page content.
 
 URL: ${url}
 
 Return JSON in this exact format:
-{"title": "...", "abstract": "...", "keywords": ["...", "..."]}
+{"title": "...", "authors": "...", "year": 2024, "abstract": "...", "keywords": ["...", "..."]}
+
+For "authors", list all author names comma-separated (e.g. "Smith, J., Lee, K."). If no authors found, use "".
+For "year", use the publication year as a number. If unknown, use null.
 
 Page content:
 ${truncated}`,
@@ -70,17 +81,19 @@ ${truncated}`,
     const parsed = JSON.parse(cleaned);
     return {
       title: parsed.title || "",
+      authors: parsed.authors || "",
+      year: typeof parsed.year === "number" ? parsed.year : null,
       abstract: parsed.abstract || "",
       keywords: Array.isArray(parsed.keywords) ? parsed.keywords : [],
     };
   } catch {
-    return { title: "", abstract: "", keywords: [] };
+    return { title: "", authors: "", year: null, abstract: "", keywords: [] };
   }
 }
 
 export async function extractPaperMetadata(
   rawText: string
-): Promise<{ title: string; abstract: string; keywords: string[] }> {
+): Promise<Metadata> {
   const truncated = rawText.slice(0, 6000);
 
   const response = await getLLM().chat.completions.create({
@@ -93,10 +106,13 @@ export async function extractPaperMetadata(
       },
       {
         role: "user",
-        content: `Extract the title, abstract, and keywords from this paper text. If keywords aren't explicitly listed, infer 3-5 relevant ones from the content.
+        content: `Extract the title, authors, publication year, abstract, and keywords from this paper text. If keywords aren't explicitly listed, infer 3-5 relevant ones from the content.
 
 Return JSON in this exact format:
-{"title": "...", "abstract": "...", "keywords": ["...", "..."]}
+{"title": "...", "authors": "...", "year": 2024, "abstract": "...", "keywords": ["...", "..."]}
+
+For "authors", list all author names comma-separated (e.g. "Smith, J., Lee, K."). If no authors found, use "".
+For "year", use the publication year as a number. If unknown, use null.
 
 Paper text:
 ${truncated}`,
@@ -116,11 +132,13 @@ ${truncated}`,
     const parsed = JSON.parse(cleaned);
     return {
       title: parsed.title || "",
+      authors: parsed.authors || "",
+      year: typeof parsed.year === "number" ? parsed.year : null,
       abstract: parsed.abstract || "",
       keywords: Array.isArray(parsed.keywords) ? parsed.keywords : [],
     };
   } catch {
-    return { title: "", abstract: "", keywords: [] };
+    return { title: "", authors: "", year: null, abstract: "", keywords: [] };
   }
 }
 
@@ -238,6 +256,8 @@ export async function createSubmission(params: {
   contentType: "paper" | "link" | "note" | "idea";
   title: string | null;
   body: string;
+  authors?: string | null;
+  year?: number | null;
   filePath?: string | null;
 }): Promise<{ id: string }> {
   const cycleId = await getCurrentCycleId();
@@ -250,6 +270,8 @@ export async function createSubmission(params: {
       content_type: params.contentType,
       title: params.title,
       body: params.body,
+      authors: params.authors || null,
+      year: params.year || null,
       file_path: params.filePath || null,
       cycle_id: cycleId,
     })
@@ -296,6 +318,78 @@ export async function getCycleStats(): Promise<{
     contributorCount: uniqueContributors,
     cycleNumber: cycle.cycle_number,
   };
+}
+
+// --- Chat with Funnel ---
+
+export async function chatWithFunnel(question: string, dmUserName?: string): Promise<string> {
+  const supabase = getSupabase();
+
+  // Fetch all submissions with profile names
+  const { data: submissions } = await supabase
+    .from("submissions")
+    .select("title, body, content_type, authors, year, created_at, profiles(name)")
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (!submissions || submissions.length === 0) {
+    return "The funnel is empty — no submissions yet. Ask people to drop some papers and links!";
+  }
+
+  // Build context from submissions
+  const context = submissions
+    .map((s: any) => {
+      const submittedBy = s.profiles?.name || "Unknown";
+      const authors = s.authors ? `Authors: ${s.authors}` : "";
+      const year = s.year ? `Year: ${s.year}` : "";
+      const meta = [authors, year].filter(Boolean).join(" | ");
+      return `[${s.content_type}] "${s.title}" — submitted by ${submittedBy}\n${meta}\n${s.body?.slice(0, 500) || ""}`;
+    })
+    .join("\n\n---\n\n");
+
+  const response = await getLLM().chat.completions.create({
+    model: "deepseek-chat",
+    messages: [
+      {
+        role: "system",
+        content: dmUserName
+          ? `You are a concise, friendly research assistant for a knowledge funnel — a shared collection of papers, links, notes, and ideas from a research workgroup. You're chatting privately with ${dmUserName}.
+
+RULES:
+- Greet ${dmUserName} by name on first interaction. Be warm but brief.
+- Be SHORT. Match the intensity of the question. A simple question gets 1-3 sentences.
+- Go straight to the relevant submissions. Name the title, authors, and who submitted it.
+- Do NOT summarize papers unless explicitly asked. Just point to them.
+- If they ask what's been submitted or want an overview, list items briefly and end with: "See all submissions at https://knowledge-funnel.vercel.app"
+- When listing multiple items, use a compact format: "**Title** (by Name)" on each line.
+- Never be generic or filler-y. Every sentence should contain useful information.
+- You can also help them submit: remind them they can drop PDFs here or use /submit-link and /submit-note.
+
+=== SUBMISSIONS ===
+${context}`
+          : `You are a concise research librarian for a knowledge funnel — a shared collection of papers, links, notes, and ideas from a research workgroup.
+
+RULES:
+- Be SHORT. Match the intensity of the question. A simple question gets 1-3 sentences.
+- Go straight to the relevant submissions. Name the title and who submitted it.
+- Do NOT summarize papers unless explicitly asked. Just point to them.
+- If someone asks what's been submitted or wants an overview, list the relevant items briefly and end with: "See all submissions at https://knowledge-funnel.vercel.app"
+- When listing multiple items, use a compact format: "**Title** (by Name)" on each line.
+- Never be generic or filler-y. Every sentence should contain useful information.
+
+=== SUBMISSIONS ===
+${context}`,
+      },
+      {
+        role: "user",
+        content: question,
+      },
+    ],
+    temperature: 0.3,
+    max_tokens: 1500,
+  });
+
+  return response.choices[0]?.message?.content || "I couldn't generate a response. Try again.";
 }
 
 // --- URL Fetching ---

@@ -11,6 +11,7 @@ import {
   extractPaperMetadata,
   getCycleStats,
   getSupabase,
+  chatWithFunnel,
 } from "./shared.js";
 
 const EMBED_COLOR = 0x2A2535;
@@ -45,7 +46,7 @@ export async function handleSubmitLink(
     );
 
     // Fetch and extract metadata (graceful fallback if site blocks us)
-    let metadata = { title: "", abstract: "", keywords: [] as string[] };
+    let metadata = { title: "", authors: "", year: null as number | null, abstract: "", keywords: [] as string[] };
     let fetchWarning = "";
     try {
       metadata = await fetchAndExtractUrl(url);
@@ -74,6 +75,8 @@ export async function handleSubmitLink(
       contentType: "link",
       title: metadata.title || url,
       body: parts.join("\n\n"),
+      authors: metadata.authors,
+      year: metadata.year,
     });
 
     const embed = new EmbedBuilder()
@@ -90,6 +93,20 @@ export async function handleSubmitLink(
       value: displayName,
       inline: true,
     });
+    if (metadata.authors) {
+      embed.addFields({
+        name: "Authors",
+        value: metadata.authors.slice(0, 1024),
+        inline: true,
+      });
+    }
+    if (metadata.year) {
+      embed.addFields({
+        name: "Year",
+        value: String(metadata.year),
+        inline: true,
+      });
+    }
     if (comment) {
       embed.addFields({
         name: "Your Comment",
@@ -284,6 +301,42 @@ export async function handleMySubmissions(
   }
 }
 
+// --- Mention Chat Handler ---
+
+export async function handleMention(message: Message, isDM = false) {
+  // Strip the bot mention to get the question
+  const question = isDM
+    ? message.content.trim()
+    : message.content.replace(/<@!?\d+>/g, "").trim();
+
+  if (!question) {
+    await message.reply("Ask me something about the funnel! e.g. *@Vacuum Bot what papers do we have about HCI?*");
+    return;
+  }
+
+  try {
+    await message.channel.sendTyping();
+    const dmUserName = isDM
+      ? (message.member?.displayName || message.author.displayName || message.author.username)
+      : undefined;
+    const answer = await chatWithFunnel(question, dmUserName);
+
+    // Discord has a 2000 char limit per message
+    if (answer.length <= 2000) {
+      await message.reply(answer);
+    } else {
+      // Split into chunks
+      const chunks = answer.match(/[\s\S]{1,1990}/g) || [answer];
+      for (const chunk of chunks) {
+        await message.reply(chunk);
+      }
+    }
+  } catch (err) {
+    console.error("mention-chat error:", err);
+    await message.reply("Something went wrong processing your question. Try again.");
+  }
+}
+
 // --- PDF Attachment Handler ---
 
 export async function handlePdfAttachment(
@@ -335,12 +388,16 @@ export async function handlePdfAttachment(
 
     // LLM metadata extraction
     let title = "";
+    let authors = "";
+    let year: number | null = null;
     let abstract = "";
     let keywords: string[] = [];
 
     if (rawText.length > 50) {
       const metadata = await extractPaperMetadata(rawText);
       title = metadata.title;
+      authors = metadata.authors;
+      year = metadata.year;
       abstract = metadata.abstract;
       keywords = metadata.keywords;
     }
@@ -362,6 +419,8 @@ export async function handlePdfAttachment(
       contentType: "paper",
       title,
       body: parts.join("\n\n"),
+      authors,
+      year,
       filePath: fileName,
     });
 
@@ -377,6 +436,20 @@ export async function handlePdfAttachment(
       value: displayName,
       inline: true,
     });
+    if (authors) {
+      embed.addFields({
+        name: "Authors",
+        value: authors.slice(0, 1024),
+        inline: true,
+      });
+    }
+    if (year) {
+      embed.addFields({
+        name: "Year",
+        value: String(year),
+        inline: true,
+      });
+    }
     if (userComment) {
       embed.addFields({
         name: "Your Comment",
