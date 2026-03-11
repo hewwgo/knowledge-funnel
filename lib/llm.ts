@@ -50,3 +50,50 @@ ${truncated}`,
     return { title: "", abstract: "", keywords: [] };
   }
 }
+
+export async function extractUrlMetadata(pageText: string, url: string): Promise<{
+  title: string;
+  abstract: string;
+  keywords: string[];
+}> {
+  const truncated = pageText.slice(0, 6000);
+
+  const response = await client.chat.completions.create({
+    model: "deepseek-chat",
+    messages: [
+      {
+        role: "system",
+        content:
+          "You extract structured metadata from web page content. Return ONLY valid JSON, no markdown fences.",
+      },
+      {
+        role: "user",
+        content: `Extract the title, a concise summary (as "abstract"), and 3-5 keywords from this web page content.
+
+URL: ${url}
+
+Return JSON in this exact format:
+{"title": "...", "abstract": "...", "keywords": ["...", "..."]}
+
+Page content:
+${truncated}`,
+      },
+    ],
+    temperature: 0,
+    max_tokens: 1000,
+  });
+
+  const content = response.choices[0]?.message?.content || "";
+
+  try {
+    const cleaned = content.replace(/```json?\n?/g, "").replace(/```/g, "").trim();
+    const parsed = JSON.parse(cleaned);
+    return {
+      title: parsed.title || "",
+      abstract: parsed.abstract || "",
+      keywords: Array.isArray(parsed.keywords) ? parsed.keywords : [],
+    };
+  } catch {
+    return { title: "", abstract: "", keywords: [] };
+  }
+}

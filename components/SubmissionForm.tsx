@@ -21,6 +21,7 @@ interface Profile {
 
 type FormState = "landing" | "uploading" | "editing" | "sucking" | "profile";
 type InputMode = "pdf" | "url" | "text";
+type SourceType = "pdf" | "url";
 
 export default function SubmissionForm({
   onSubmitted,
@@ -44,6 +45,8 @@ export default function SubmissionForm({
   const [inputMode, setInputMode] = useState<InputMode>("pdf");
   const [urlValue, setUrlValue] = useState("");
   const [textValue, setTextValue] = useState("");
+  const [sourceType, setSourceType] = useState<SourceType>("pdf");
+  const [sourceUrl, setSourceUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -71,6 +74,8 @@ export default function SubmissionForm({
   const uploadAndExtract = useCallback(async (file: File) => {
     if (!file.name.toLowerCase().endsWith(".pdf")) return;
     setFormState("uploading");
+    setSourceType("pdf");
+    setSourceUrl(null);
 
     try {
       const storagePath = `${Date.now()}-${file.name}`;
@@ -126,35 +131,49 @@ export default function SubmissionForm({
     setShowThought(false);
     setUrlValue("");
     setTextValue("");
+    setSourceType("pdf");
+    setSourceUrl(null);
     setFormState("landing");
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const handleUrlSubmit = async () => {
-    if (!urlValue.trim() || !selectedProfileId) return;
-    setSubmitting(true);
-    setFormState("sucking");
-    await new Promise((r) => setTimeout(r, 600));
+  const handleUrlExtract = async () => {
+    const trimmedUrl = urlValue.trim();
+    if (!trimmedUrl) return;
+    setFormState("uploading");
+    setSourceType("url");
+    setSourceUrl(trimmedUrl);
+
+    let extractedTitle = "";
     try {
-      await fetch("/api/submissions", {
+      const res = await fetch("/api/upload-url", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          profile_id: selectedProfileId,
-          content_type: "link",
-          title: urlValue.trim(),
-          body: urlValue.trim(),
-          file_path: null,
-        }),
+        body: JSON.stringify({ url: trimmedUrl }),
       });
-      clearAll();
-      onSubmitted();
+
+      if (res.ok) {
+        const data = await res.json();
+        extractedTitle = data.title || "";
+        if (data.title) setTitle(data.title);
+        if (data.abstract) setAbstract(data.abstract);
+        if (data.keywords) setKeywords(data.keywords);
+      }
     } catch (err) {
-      console.error("URL submission failed:", err);
-      setFormState("landing");
-    } finally {
-      setSubmitting(false);
+      console.error("URL extraction failed:", err);
     }
+
+    // Fallback title from URL hostname if extraction gave nothing
+    if (!extractedTitle) {
+      try {
+        const fallback = new URL(trimmedUrl).hostname.replace(/^www\./, "");
+        setTitle(fallback);
+      } catch {
+        setTitle(trimmedUrl);
+      }
+    }
+    // Always show the editing card so user can review before submitting
+    setFormState("editing");
   };
 
   const handleTextSubmit = async () => {
@@ -205,16 +224,19 @@ export default function SubmissionForm({
       }> = [];
 
       if (abstract.trim()) {
-        let paperBody = abstract.trim();
+        let mainBody = abstract.trim();
         if (keywords.length > 0) {
-          paperBody += `\n\nKeywords: ${keywords.join(", ")}`;
+          mainBody += `\n\nKeywords: ${keywords.join(", ")}`;
+        }
+        if (sourceType === "url" && sourceUrl) {
+          mainBody += `\n\nSource: ${sourceUrl}`;
         }
         submissions.push({
           profile_id: selectedProfileId,
-          content_type: "paper",
+          content_type: sourceType === "url" ? "link" : "paper",
           title: title.trim() || null,
-          body: paperBody,
-          file_path: filePath,
+          body: mainBody,
+          file_path: sourceType === "pdf" ? filePath : null,
         });
       }
 
@@ -337,12 +359,12 @@ export default function SubmissionForm({
                   className="url-input"
                   autoFocus
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") handleUrlSubmit();
+                    if (e.key === "Enter") handleUrlExtract();
                   }}
                 />
                 <button
                   type="button"
-                  onClick={handleUrlSubmit}
+                  onClick={handleUrlExtract}
                   disabled={!urlValue.trim() || submitting}
                   className="submit-btn-small"
                 >
@@ -395,8 +417,14 @@ export default function SubmissionForm({
     <div className="center-form">
       {fileInput}
       <div className={`edit-card${formState === "sucking" ? " edit-card-sucking" : ""}`}>
-        {/* Paper info */}
+        {/* Paper/Link info */}
         <div className="edit-card-paper">
+          {sourceType === "url" && sourceUrl && (
+            <p className="edit-card-source">
+              <span className="edit-card-source-label">URL</span>
+              {sourceUrl}
+            </p>
+          )}
           <h3 className="edit-card-title">{title || "Untitled"}</h3>
           {keywords.length > 0 && (
             <div className="edit-card-keywords">

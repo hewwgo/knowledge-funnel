@@ -379,6 +379,25 @@ body {
   margin-bottom: 8px;
 }
 
+.edit-card-source {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+  margin-bottom: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.edit-card-source-label {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(180, 210, 255, 0.8);
+  margin-right: 8px;
+}
+
 .edit-card-remove {
   background: none;
   border: none;
