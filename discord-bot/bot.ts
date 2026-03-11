@@ -32,6 +32,16 @@ client.once(Events.ClientReady, (c) => {
 client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
+  // Restrict slash commands to the configured channel
+  const channelId = process.env.DISCORD_CHANNEL_ID;
+  if (channelId && interaction.channelId !== channelId) {
+    await interaction.reply({
+      content: `This command only works in <#${channelId}>.`,
+      flags: ["Ephemeral"],
+    });
+    return;
+  }
+
   switch (interaction.commandName) {
     case "submit-link":
       await handleSubmitLink(interaction);
