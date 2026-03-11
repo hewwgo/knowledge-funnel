@@ -396,7 +396,7 @@ ${context}`,
 
 export async function fetchAndExtractUrl(
   url: string
-): Promise<{ title: string; abstract: string; keywords: string[] }> {
+): Promise<Metadata> {
   const res = await fetch(url, {
     headers: {
       "User-Agent":
@@ -417,6 +417,8 @@ export async function fetchAndExtractUrl(
     const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
     return {
       title: titleMatch ? titleMatch[1].trim().slice(0, 200) : url,
+      authors: "",
+      year: null,
       abstract: "",
       keywords: [],
     };

@@ -54,12 +54,14 @@ Storage: `funnel-uploads` bucket in Supabase Storage for PDFs.
 
 - `profiles.discord_id` — Links a Discord account to a profile (unique). Enables cross-platform identity between web UI and Discord bot.
 - `submissions.content_type` — One of: `paper`, `link`, `note`, `idea`
+- `submissions.authors` — Comma-separated author names (extracted by LLM)
+- `submissions.year` — Publication year (extracted by LLM)
 - `submissions.file_path` — Storage path for uploaded PDFs
 
 ### Content Types
 
-- **paper** — PDF upload with extracted title/abstract/keywords
-- **link** — URL with fetched + LLM-extracted metadata
+- **paper** — PDF upload with extracted title/authors/year/abstract/keywords
+- **link** — URL with fetched + LLM-extracted metadata (title/authors/year/abstract/keywords)
 - **note** — Free-text research note
 - **idea** — Thought/comment (often in response to a paper)
 
@@ -87,11 +89,12 @@ Storage: `funnel-uploads` bucket in Supabase Storage for PDFs.
 6. Submit → `/api/submissions` POST → inserts into Supabase → Discord webhook notification
 
 ### Discord Bot Path
-1. User runs slash command or uploads PDF in the designated channel
-2. Bot auto-creates or links their profile (by matching Discord display name to web profile name, or by `discord_id`)
-3. Same LLM extraction pipeline (DeepSeek) for URLs and PDFs
+1. User runs slash command, uploads PDF, or @mentions the bot in the designated channel (or DMs)
+2. Bot auto-creates or links their profile (by matching Discord server display name to web profile name, or by `discord_id`)
+3. Same LLM extraction pipeline (DeepSeek) for URLs and PDFs — extracts title, authors, year, abstract, keywords
 4. Inserts directly into Supabase `submissions` table
-5. Confirms back to user with an embed in the channel
+5. Confirms back to user with a rich embed (title, authors, year, keywords, comment, submitted by)
+6. @mentions trigger LLM chat that queries all submissions and answers as a research librarian
 
 ### Profile Identity
 
@@ -113,13 +116,48 @@ Discord and web submissions are unified under one profile:
 
 ### PDF Auto-Detection
 
-Drop a PDF in the channel → bot downloads it, uploads to Supabase Storage, extracts text with `unpdf`, runs LLM metadata extraction, creates a `paper` submission. No slash command needed.
+Drop a PDF in the channel → bot downloads it, uploads to Supabase Storage, extracts text with `unpdf`, runs LLM metadata extraction, creates a `paper` submission. No slash command needed. Any text written alongside the PDF attachment is captured as a comment on the submission.
+
+The bot shows "Processing your PDF..." while working, then deletes that message and posts a rich embed with the extracted metadata.
+
+### @Mention Chat (LLM-powered)
+
+Mention the bot in the channel (e.g., `@Vacuum Bot what papers do we have about HCI?`) and it queries all submissions from Supabase, packs them into LLM context, and answers as a concise research librarian. Rules:
+- Short responses — matches intensity of the question
+- Names titles and who submitted them
+- Doesn't summarize unless asked
+- Points users to the web UI for full overview
+
+### DM Support
+
+Users can DM the bot directly:
+- **PDF drops** — processed the same as channel PDFs (uploaded to Supabase, metadata extracted)
+- **Text messages** — treated as chat questions, answered by the LLM with a slightly warmer, personal tone (greets by name)
+- DMs bypass the channel restriction — no `DISCORD_CHANNEL_ID` check
+
+### Authors & Year Extraction
+
+The LLM extraction pipeline (DeepSeek) now extracts authors and publication year from both PDFs and URLs. These are stored in `submissions.authors` and `submissions.year`, displayed in embeds, and included in the chat context.
+
+### Graceful URL Fallback
+
+When `/submit-link` fails to fetch a URL (403 Forbidden, 404 Not Found, etc.), the submission is still created with the URL as the title. The embed shows a warning explaining the issue and suggests alternatives (drop the PDF directly, or use `/submit-note`).
+
+### Rich Embeds
+
+All submission embeds include:
+- **Submitted by** — the user's server display name
+- **Authors** / **Year** — if extracted
+- **Your Comment** — any text the user wrote alongside the submission
+- **Summary/Abstract** — LLM-extracted
+- **Keywords** — LLM-extracted
 
 ### Channel Confinement
 
 The bot is locked to a single channel via `DISCORD_CHANNEL_ID`:
 - Slash commands in other channels get an ephemeral redirect message
-- PDF detection silently ignores other channels
+- PDF detection and @mentions silently ignore other channels
+- DMs are always allowed (bypass channel restriction)
 - This keeps the bot from interfering with other server activity
 
 ### Single-Instance Guard
@@ -184,8 +222,8 @@ knowledge-funnel/
 ├── discord-bot/             # Discord bot (separate service)
 │   ├── bot.ts               # Entry point + PID lock + event handlers
 │   ├── commands.ts          # Slash command definitions (4 commands)
-│   ├── handlers.ts          # Command + PDF attachment handlers
-│   ├── shared.ts            # Supabase + LLM clients (shared logic)
+│   ├── handlers.ts          # Command + PDF + mention chat handlers
+│   ├── shared.ts            # Supabase + LLM clients + chatWithFunnel
 │   ├── register-commands.ts # One-time slash command registration script
 │   ├── package.json
 │   ├── tsconfig.json
@@ -202,6 +240,11 @@ knowledge-funnel/
 - [x] Discord bot ingestion (slash commands + PDF auto-detect)
 - [x] Cross-platform profile identity (discord_id auto-linking)
 - [x] Channel confinement + single-instance guard
+- [x] Authors & year extraction (LLM pipeline for both PDFs and URLs)
+- [x] @Mention LLM chat in channel (research librarian mode)
+- [x] DM support (private PDF submissions + private chat)
+- [x] Rich embeds with submitted-by, comments, authors, year, keywords
+- [x] Graceful URL fallback (403/404 handling with helpful messages)
 - [ ] Module 2: Twin agent convergence (LLM pipeline → pitches)
 - [ ] Module 3: Feedback loop (researchers review pitches)
 

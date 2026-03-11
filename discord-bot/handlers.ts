@@ -3,6 +3,7 @@ import {
   Message,
   EmbedBuilder,
   Attachment,
+  ChannelType,
 } from "discord.js";
 import {
   findOrCreateProfile,
@@ -315,7 +316,7 @@ export async function handleMention(message: Message, isDM = false) {
   }
 
   try {
-    await message.channel.sendTyping();
+    if ('sendTyping' in message.channel) await message.channel.sendTyping();
     const dmUserName = isDM
       ? (message.member?.displayName || message.author.displayName || message.author.username)
       : undefined;
@@ -344,7 +345,8 @@ export async function handlePdfAttachment(
   attachment: Attachment
 ) {
   const channelId = process.env.DISCORD_CHANNEL_ID;
-  if (channelId && message.channelId !== channelId) return;
+  const isDM = message.channel.type === ChannelType.DM;
+  if (!isDM && channelId && message.channelId !== channelId) return;
 
   const processingMsg = await message.reply("Processing your PDF...");
 
