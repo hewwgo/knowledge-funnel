@@ -10,6 +10,7 @@
 
 # env files
 .env*.local
+discord-bot/.env
 
 # misc
 .DS_Store

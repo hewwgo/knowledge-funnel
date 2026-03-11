@@ -22,6 +22,7 @@ create table profiles (
   recent_paper text,
   cv_url text,
   additional_context text,
+  discord_id text unique,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
