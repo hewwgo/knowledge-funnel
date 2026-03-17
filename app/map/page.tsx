@@ -56,8 +56,14 @@ export default function MapPage() {
   const fetchData = useCallback(async () => {
     try {
       const res = await fetch("/api/map/data");
-      if (!res.ok) throw new Error("Failed to fetch map data");
-      const json = await res.json();
+      const text = await res.text();
+      let json;
+      try {
+        json = JSON.parse(text);
+      } catch {
+        throw new Error(`Server returned invalid JSON: ${text.slice(0, 200)}`);
+      }
+      if (!res.ok) throw new Error(json.error || "Failed to fetch map data");
       setData(json);
       setError(null);
     } catch (e) {
@@ -75,16 +81,15 @@ export default function MapPage() {
     setComputing(true);
     try {
       const res = await fetch("/api/map/compute", { method: "POST" });
+      const text = await res.text();
+      let json;
+      try {
+        json = JSON.parse(text);
+      } catch {
+        throw new Error(`Compute returned invalid response (${res.status}): ${text.slice(0, 300)}`);
+      }
       if (!res.ok) {
-        let msg = `Compute failed (${res.status})`;
-        try {
-          const json = await res.json();
-          msg = json.error || msg;
-        } catch {
-          const text = await res.text();
-          msg = text.slice(0, 200) || msg;
-        }
-        throw new Error(msg);
+        throw new Error(json.error || `Compute failed (${res.status})`);
       }
       await fetchData();
     } catch (e) {
