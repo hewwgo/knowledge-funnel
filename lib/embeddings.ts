@@ -15,22 +15,47 @@ const embeddingClient = new OpenAI({
 
 const EMBEDDING_MODEL = "voyage-3-lite";
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 // Generate embeddings for an array of texts
-// Batches in chunks of 100
+// Small batches with delay to respect Voyage rate limits
 export async function generateEmbeddings(
   texts: string[]
 ): Promise<number[][]> {
-  const BATCH_SIZE = 100;
+  const BATCH_SIZE = 8;
   const embeddings: number[][] = [];
 
   for (let i = 0; i < texts.length; i += BATCH_SIZE) {
     const batch = texts.slice(i, i + BATCH_SIZE);
-    const response = await embeddingClient.embeddings.create({
-      model: EMBEDDING_MODEL,
-      input: batch,
-    });
-    for (const item of response.data) {
-      embeddings.push(item.embedding);
+
+    // Retry with backoff on rate limit
+    let retries = 3;
+    let delay = 2000;
+    while (retries > 0) {
+      try {
+        const response = await embeddingClient.embeddings.create({
+          model: EMBEDDING_MODEL,
+          input: batch,
+        });
+        for (const item of response.data) {
+          embeddings.push(item.embedding);
+        }
+        break;
+      } catch (e: unknown) {
+        const err = e as { status?: number };
+        if (err.status === 429 && retries > 1) {
+          retries--;
+          await sleep(delay);
+          delay *= 2;
+        } else {
+          throw e;
+        }
+      }
+    }
+
+    // Pause between batches to stay under rate limit
+    if (i + BATCH_SIZE < texts.length) {
+      await sleep(1000);
     }
   }
 
