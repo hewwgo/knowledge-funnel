@@ -76,8 +76,15 @@ export default function MapPage() {
     try {
       const res = await fetch("/api/map/compute", { method: "POST" });
       if (!res.ok) {
-        const json = await res.json();
-        throw new Error(json.error || "Compute failed");
+        let msg = `Compute failed (${res.status})`;
+        try {
+          const json = await res.json();
+          msg = json.error || msg;
+        } catch {
+          const text = await res.text();
+          msg = text.slice(0, 200) || msg;
+        }
+        throw new Error(msg);
       }
       await fetchData();
     } catch (e) {
