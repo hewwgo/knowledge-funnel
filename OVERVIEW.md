@@ -225,6 +225,8 @@ knowledge-funnel/
 │   ├── handlers.ts          # Command + PDF + mention chat handlers
 │   ├── shared.ts            # Supabase + LLM clients + chatWithFunnel
 │   ├── register-commands.ts # One-time slash command registration script
+│   ├── Dockerfile           # Railway cloud deployment
+│   ├── .dockerignore
 │   ├── package.json
 │   ├── tsconfig.json
 │   └── .env.example
@@ -245,6 +247,7 @@ knowledge-funnel/
 - [x] DM support (private PDF submissions + private chat)
 - [x] Rich embeds with submitted-by, comments, authors, year, keywords
 - [x] Graceful URL fallback (403/404 handling with helpful messages)
+- [x] Railway cloud deployment (bot runs 24/7, auto-deploys from GitHub)
 - [ ] Module 2: Twin agent convergence (LLM pipeline → pitches)
 - [ ] Module 3: Feedback loop (researchers review pitches)
 
@@ -276,7 +279,34 @@ knowledge-funnel/
 
 ### Switching Servers / Channels
 
-1. Update `DISCORD_CHANNEL_ID` in `discord-bot/.env`
+1. Update `DISCORD_CHANNEL_ID` in `discord-bot/.env` (and in Railway Variables if deployed)
 2. Have the new server admin authorize via the OAuth2 invite URL
 3. Re-register commands: `npm run register`
-4. Restart: kill existing bot, then `npm run start`
+4. Restart: kill existing bot, then `npm run start` (Railway auto-redeploys on push)
+
+## Deployment
+
+### Discord Bot — Railway (Cloud, 24/7)
+
+The bot is deployed on [Railway](https://railway.app) for always-on operation. It auto-deploys when changes are pushed to `main` on GitHub.
+
+**How it works:**
+- Railway builds from the `Dockerfile` in `discord-bot/`
+- Root directory is set to `discord-bot` in Railway service settings
+- Environment variables are configured in Railway's service Variables tab (not `.env` files)
+- The bot compiles TypeScript via `tsc` and runs `node dist/bot.js`
+
+**Required Railway Variables:**
+| Variable | Value |
+|----------|-------|
+| `DISCORD_BOT_TOKEN` | Bot token from Discord Developer Portal |
+| `DISCORD_CHANNEL_ID` | Target channel ID |
+| `SUPABASE_URL` | `https://your-project.supabase.co` |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role key from Supabase |
+| `DEEPSEEK_API_KEY` | DeepSeek API key |
+
+**Important:** Do not run the bot locally and on Railway simultaneously — two instances with the same token will conflict. Kill the local process before relying on Railway.
+
+### Web UI — Vercel
+
+The Next.js frontend is deployed on Vercel at `https://knowledge-funnel.vercel.app`.

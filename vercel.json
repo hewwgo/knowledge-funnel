@@ -1,0 +1,13 @@
+{
+  "functions": {
+    "app/api/map/compute/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/upload/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/upload-url/route.ts": {
+      "maxDuration": 60
+    }
+  }
+}
