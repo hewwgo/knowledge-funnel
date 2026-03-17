@@ -6,16 +6,34 @@ const deepseek = new OpenAI({
   baseURL: "https://api.deepseek.com",
 });
 
-// Voyage AI (Anthropic's embedding service) — free tier: 200M tokens/month
-// Sign up at dash.voyageai.com, grab an API key
-const embeddingClient = new OpenAI({
-  apiKey: process.env.VOYAGE_API_KEY || "",
-  baseURL: "https://api.voyageai.com/v1",
-});
-
-const EMBEDDING_MODEL = "voyage-3-lite";
+const VOYAGE_API_KEY = () => process.env.VOYAGE_API_KEY || "";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// Call Voyage API directly (not via OpenAI SDK — compatibility issues)
+async function callVoyageEmbeddings(
+  texts: string[]
+): Promise<number[][]> {
+  const res = await fetch("https://api.voyageai.com/v1/embeddings", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${VOYAGE_API_KEY()}`,
+    },
+    body: JSON.stringify({
+      input: texts,
+      model: "voyage-3-lite",
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Voyage API ${res.status}: ${body}`);
+  }
+
+  const json = await res.json();
+  return json.data.map((d: { embedding: number[] }) => d.embedding);
+}
 
 // Generate embeddings for an array of texts
 // Small batches with delay to respect Voyage rate limits
@@ -33,17 +51,12 @@ export async function generateEmbeddings(
     let delay = 2000;
     while (retries > 0) {
       try {
-        const response = await embeddingClient.embeddings.create({
-          model: EMBEDDING_MODEL,
-          input: batch,
-        });
-        for (const item of response.data) {
-          embeddings.push(item.embedding);
-        }
+        const result = await callVoyageEmbeddings(batch);
+        embeddings.push(...result);
         break;
       } catch (e: unknown) {
-        const err = e as { status?: number };
-        if (err.status === 429 && retries > 1) {
+        const msg = String(e);
+        if (msg.includes("429") && retries > 1) {
           retries--;
           await sleep(delay);
           delay *= 2;
@@ -55,7 +68,7 @@ export async function generateEmbeddings(
 
     // Pause between batches to stay under rate limit
     if (i + BATCH_SIZE < texts.length) {
-      await sleep(1000);
+      await sleep(1500);
     }
   }
 
