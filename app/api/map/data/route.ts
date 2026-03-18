@@ -15,7 +15,7 @@ export async function GET() {
     // 1. Fetch all concepts
     const { data: concepts, error: cErr } = await supabase
       .from("concepts")
-      .select("id, label");
+      .select("id, label, level");
     if (cErr) throw cErr;
     if (!concepts || concepts.length === 0) {
       return NextResponse.json({
@@ -137,6 +137,7 @@ export async function GET() {
         return {
           id: c.id,
           label: c.label,
+          level: (c as { level?: string }).level || "specific",
           submissionCount: conceptSubmissions.get(c.id)?.size || 0,
           researcherIds,
           researcherColors,

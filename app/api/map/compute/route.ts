@@ -4,7 +4,7 @@ import { extractConcepts } from "@/lib/concepts";
 
 export const maxDuration = 60;
 
-const BATCH_SIZE = 2; // Process max 2 submissions per invocation to stay within 60s
+const BATCH_SIZE = 2;
 
 export async function POST() {
   try {
@@ -53,10 +53,10 @@ export async function POST() {
     // Pre-fetch all existing concepts to minimize DB round-trips
     const { data: allConcepts } = await supabase
       .from("concepts")
-      .select("id, label");
-    const conceptCache = new Map<string, string>();
+      .select("id, label, level");
+    const conceptCache = new Map<string, { id: string; level: string }>();
     for (const c of allConcepts || []) {
-      conceptCache.set(c.label, c.id);
+      conceptCache.set(c.label, { id: c.id, level: c.level || "specific" });
     }
 
     for (const sub of batch) {
@@ -65,13 +65,22 @@ export async function POST() {
 
       // Upsert each concept (use cache first)
       const conceptIds = new Map<string, string>();
-      for (const label of result.concepts) {
-        if (conceptCache.has(label)) {
-          conceptIds.set(label, conceptCache.get(label)!);
+      for (const concept of result.concepts) {
+        const cached = conceptCache.get(concept.label);
+        if (cached) {
+          conceptIds.set(concept.label, cached.id);
+          // Upgrade to broad if newly classified as broad
+          if (concept.level === "broad" && cached.level !== "broad") {
+            await supabase
+              .from("concepts")
+              .update({ level: "broad" })
+              .eq("id", cached.id);
+            cached.level = "broad";
+          }
         } else {
           const { data: inserted, error: insertErr } = await supabase
             .from("concepts")
-            .insert({ label })
+            .insert({ label: concept.label, level: concept.level })
             .select("id")
             .single();
           if (insertErr) {
@@ -79,23 +88,23 @@ export async function POST() {
             const { data: retry } = await supabase
               .from("concepts")
               .select("id")
-              .eq("label", label)
+              .eq("label", concept.label)
               .single();
             if (retry) {
-              conceptIds.set(label, retry.id);
-              conceptCache.set(label, retry.id);
+              conceptIds.set(concept.label, retry.id);
+              conceptCache.set(concept.label, { id: retry.id, level: concept.level });
             }
             continue;
           }
           if (inserted) {
-            conceptIds.set(label, inserted.id);
-            conceptCache.set(label, inserted.id);
+            conceptIds.set(concept.label, inserted.id);
+            conceptCache.set(concept.label, { id: inserted.id, level: concept.level });
             newConcepts++;
           }
         }
       }
 
-      // Link submission to concepts (single batch upsert)
+      // Link submission to concepts
       const links = Array.from(conceptIds.values()).map((conceptId) => ({
         submission_id: sub.id,
         concept_id: conceptId,
@@ -106,47 +115,38 @@ export async function POST() {
           .upsert(links, { onConflict: "submission_id,concept_id" });
       }
 
-      // Create edges between co-occurring concepts (batch)
-      const conceptLabels = Array.from(conceptIds.keys());
-      for (let i = 0; i < conceptLabels.length; i++) {
-        for (let j = i + 1; j < conceptLabels.length; j++) {
-          const sourceId = conceptIds.get(conceptLabels[i])!;
-          const targetId = conceptIds.get(conceptLabels[j])!;
+      // Create edges ONLY for LLM-specified relationships (not all-pairs)
+      for (const rel of result.relationships) {
+        const sourceId = conceptIds.get(rel.from);
+        const targetId = conceptIds.get(rel.to);
+        if (!sourceId || !targetId || sourceId === targetId) continue;
 
-          const rel = result.relationships.find(
-            (r) =>
-              (r.from === conceptLabels[i] && r.to === conceptLabels[j]) ||
-              (r.from === conceptLabels[j] && r.to === conceptLabels[i])
-          );
+        const { data: existingEdge } = await supabase
+          .from("concept_edges")
+          .select("id, weight")
+          .or(
+            `and(source_id.eq.${sourceId},target_id.eq.${targetId}),and(source_id.eq.${targetId},target_id.eq.${sourceId})`
+          )
+          .single();
 
-          // Check if edge exists
-          const { data: existingEdge } = await supabase
+        if (existingEdge) {
+          await supabase
             .from("concept_edges")
-            .select("id, weight")
-            .or(
-              `and(source_id.eq.${sourceId},target_id.eq.${targetId}),and(source_id.eq.${targetId},target_id.eq.${sourceId})`
-            )
-            .single();
-
-          if (existingEdge) {
-            await supabase
-              .from("concept_edges")
-              .update({
-                weight: (existingEdge.weight || 1) + 1,
-                relation: rel?.relation || "co-occurs",
-              })
-              .eq("id", existingEdge.id);
-          } else {
-            const { error: edgeErr } = await supabase
-              .from("concept_edges")
-              .insert({
-                source_id: sourceId,
-                target_id: targetId,
-                relation: rel?.relation || "co-occurs",
-                weight: 1,
-              });
-            if (!edgeErr) newEdges++;
-          }
+            .update({
+              weight: (existingEdge.weight || 1) + 1,
+              relation: rel.relation,
+            })
+            .eq("id", existingEdge.id);
+        } else {
+          const { error: edgeErr } = await supabase
+            .from("concept_edges")
+            .insert({
+              source_id: sourceId,
+              target_id: targetId,
+              relation: rel.relation,
+              weight: 1,
+            });
+          if (!edgeErr) newEdges++;
         }
       }
     }

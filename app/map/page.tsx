@@ -8,6 +8,7 @@ import ConceptDetail from "./components/ConceptDetail";
 export interface GraphNode {
   id: string;
   label: string;
+  level: "broad" | "specific";
   submissionCount: number;
   researcherIds: string[];
   researcherColors: string[];

@@ -14,6 +14,7 @@ import {
   getCycleStats,
   getSupabase,
   chatWithFunnel,
+  extractAndLinkConcepts,
 } from "./shared.js";
 
 const EMBED_COLOR = 0x2A2535;
@@ -90,6 +91,10 @@ export async function handleSubmitLink(
       year: metadata.year,
       sourceUrl: url,
     });
+
+    // Fire-and-forget concept extraction for knowledge graph
+    extractAndLinkConcepts(submission.id, metadata.title || url, parts.join("\n\n"))
+      .catch((err) => console.error("Link concept extraction failed:", err));
 
     const embed = new EmbedBuilder()
       .setColor(EMBED_COLOR)
@@ -188,6 +193,10 @@ export async function handleSubmitNote(
       title: firstLine,
       body: text,
     });
+
+    // Fire-and-forget concept extraction for knowledge graph
+    extractAndLinkConcepts(submission.id, firstLine, text)
+      .catch((err) => console.error("Note concept extraction failed:", err));
 
     const embed = new EmbedBuilder()
       .setColor(EMBED_COLOR)
@@ -441,6 +450,10 @@ export async function handlePdfAttachment(
       year,
       filePath: fileName,
     });
+
+    // Fire-and-forget concept extraction for knowledge graph
+    extractAndLinkConcepts(submission.id, title, parts.join("\n\n"))
+      .catch((err) => console.error("PDF concept extraction failed:", err));
 
     const embed = new EmbedBuilder()
       .setColor(EMBED_COLOR)
