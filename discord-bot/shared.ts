@@ -285,26 +285,24 @@ export async function createSubmission(params: {
 }
 
 /**
- * Check if a URL has already been submitted.
- * Returns the existing submission title + contributor name, or null.
+ * Check if this person already submitted this exact URL.
+ * Different people submitting the same URL is allowed (shared interest).
  */
 export async function checkDuplicateUrl(
-  url: string
-): Promise<{ title: string; contributorName: string } | null> {
+  url: string,
+  profileId: string
+): Promise<{ title: string } | null> {
   const supabase = getSupabase();
   const { data } = await supabase
     .from("submissions")
-    .select("title, profiles(name)")
+    .select("title")
     .eq("source_url", url)
+    .eq("profile_id", profileId)
     .limit(1)
     .single();
 
   if (!data) return null;
-  const profile = data.profiles as unknown as { name: string } | null;
-  return {
-    title: data.title || url,
-    contributorName: profile?.name || "Unknown",
-  };
+  return { title: data.title || url };
 }
 
 export async function getCycleStats(): Promise<{

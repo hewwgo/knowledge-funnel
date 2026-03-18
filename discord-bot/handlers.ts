@@ -37,15 +37,6 @@ export async function handleSubmitLink(
   }
 
   try {
-    // Check for duplicate URL
-    const duplicate = await checkDuplicateUrl(url);
-    if (duplicate) {
-      await interaction.editReply(
-        `This link has already been submitted: **${duplicate.title}** (contributed by ${duplicate.contributorName}).`
-      );
-      return;
-    }
-
     const displayName =
       interaction.member && "displayName" in interaction.member
         ? (interaction.member.displayName as string)
@@ -55,6 +46,15 @@ export async function handleSubmitLink(
       interaction.user.id,
       displayName
     );
+
+    // Check if this person already submitted this exact URL
+    const duplicate = await checkDuplicateUrl(url, profileId);
+    if (duplicate) {
+      await interaction.editReply(
+        `You've already submitted this link: **${duplicate.title}**`
+      );
+      return;
+    }
 
     // Fetch and extract metadata (graceful fallback if site blocks us)
     let metadata = { title: "", authors: "", year: null as number | null, abstract: "", keywords: [] as string[] };
