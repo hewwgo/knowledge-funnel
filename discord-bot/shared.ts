@@ -259,6 +259,7 @@ export async function createSubmission(params: {
   authors?: string | null;
   year?: number | null;
   filePath?: string | null;
+  sourceUrl?: string | null;
 }): Promise<{ id: string }> {
   const cycleId = await getCurrentCycleId();
   const supabase = getSupabase();
@@ -273,6 +274,7 @@ export async function createSubmission(params: {
       authors: params.authors || null,
       year: params.year || null,
       file_path: params.filePath || null,
+      source_url: params.sourceUrl || null,
       cycle_id: cycleId,
     })
     .select("id")
@@ -280,6 +282,29 @@ export async function createSubmission(params: {
 
   if (error) throw new Error(`Failed to create submission: ${error.message}`);
   return data!;
+}
+
+/**
+ * Check if a URL has already been submitted.
+ * Returns the existing submission title + contributor name, or null.
+ */
+export async function checkDuplicateUrl(
+  url: string
+): Promise<{ title: string; contributorName: string } | null> {
+  const supabase = getSupabase();
+  const { data } = await supabase
+    .from("submissions")
+    .select("title, profiles(name)")
+    .eq("source_url", url)
+    .limit(1)
+    .single();
+
+  if (!data) return null;
+  const profile = data.profiles as unknown as { name: string } | null;
+  return {
+    title: data.title || url,
+    contributorName: profile?.name || "Unknown",
+  };
 }
 
 export async function getCycleStats(): Promise<{
@@ -339,11 +364,11 @@ export async function chatWithFunnel(question: string, dmUserName?: string): Pro
   // Build context from submissions
   const context = submissions
     .map((s: any) => {
-      const submittedBy = s.profiles?.name || "Unknown";
-      const authors = s.authors ? `Authors: ${s.authors}` : "";
+      const contributor = s.profiles?.name || "Unknown";
+      const paperAuthors = s.authors ? `Paper authors: ${s.authors}` : "";
       const year = s.year ? `Year: ${s.year}` : "";
-      const meta = [authors, year].filter(Boolean).join(" | ");
-      return `[${s.content_type}] "${s.title}" — submitted by ${submittedBy}\n${meta}\n${s.body?.slice(0, 500) || ""}`;
+      const meta = [paperAuthors, year].filter(Boolean).join(" | ");
+      return `[${s.content_type}] "${s.title}" — contributed to funnel by: ${contributor}\n${meta}\n${s.body?.slice(0, 500) || ""}`;
     })
     .join("\n\n---\n\n");
 
@@ -353,31 +378,36 @@ export async function chatWithFunnel(question: string, dmUserName?: string): Pro
       {
         role: "system",
         content: dmUserName
-          ? `You are a concise, friendly research assistant for a knowledge funnel — a shared collection of papers, links, notes, and ideas from a research workgroup. You're chatting privately with ${dmUserName}.
+          ? `You are the knowledge funnel assistant, chatting privately with ${dmUserName}. The knowledge funnel is our group's shared knowledge base — everyone contributes papers, links, notes, and ideas, and you help navigate what's been collected and encourage new submissions.
 
 RULES:
 - Greet ${dmUserName} by name on first interaction. Be warm but brief.
 - Be SHORT. Match the intensity of the question. A simple question gets 1-3 sentences.
-- Go straight to the relevant submissions. Name the title, authors, and who submitted it.
+- When answering questions, point to relevant submissions already in the funnel. Name the title and who contributed it (the "contributed to funnel by" name, NOT the paper authors).
+- IMPORTANT: "contributed to funnel by" is the person who added it to our knowledge base. "Paper authors" are who wrote the original work. Always distinguish these — attribute submissions to the contributor, not the paper authors.
 - Do NOT summarize papers unless explicitly asked. Just point to them.
+- NEVER claim something is already in the database or is a duplicate. You don't have the ability to check for duplicates. Only the system can do that.
 - Only link to the website if they explicitly ask for a full list or overview: "See all submissions at https://knowledge-funnel.vercel.app"
-- When listing multiple items, use a compact format: "**Title** (by Name)" on each line.
+- When listing multiple items, use a compact format: "**Title** (contributed by Name)" on each line.
 - Never be generic or filler-y. Every sentence should contain useful information.
-- You can also help them submit: remind them they can drop PDFs here or use /submit-link and /submit-note.
+- You can help them contribute: they can drop PDFs here, or use /submit-link and /submit-note to add to the funnel.
 
-=== SUBMISSIONS ===
+=== CURRENT KNOWLEDGE BASE ===
 ${context}`
-          : `You are a concise research librarian for a knowledge funnel — a shared collection of papers, links, notes, and ideas from a research workgroup.
+          : `You are the knowledge funnel assistant. The knowledge funnel is our group's shared knowledge base — everyone contributes papers, links, notes, and ideas, and you help navigate what's been collected and encourage new submissions.
 
 RULES:
 - Be SHORT. Match the intensity of the question. A simple question gets 1-3 sentences.
-- Go straight to the relevant submissions. Name the title and who submitted it.
+- When answering questions, point to relevant submissions already in the funnel. Name the title and who contributed it (the "contributed to funnel by" name, NOT the paper authors).
+- IMPORTANT: "contributed to funnel by" is the person who added it to our knowledge base. "Paper authors" are who wrote the original work. Always distinguish these — attribute submissions to the contributor, not the paper authors.
 - Do NOT summarize papers unless explicitly asked. Just point to them.
+- NEVER claim something is already in the database or is a duplicate. You don't have the ability to check for duplicates. Only the system can do that.
 - Only link to the website if they explicitly ask for a full list or overview: "See all submissions at https://knowledge-funnel.vercel.app"
-- When listing multiple items, use a compact format: "**Title** (by Name)" on each line.
+- When listing multiple items, use a compact format: "**Title** (contributed by Name)" on each line.
 - Never be generic or filler-y. Every sentence should contain useful information.
+- You can help people contribute: they can drop PDFs here, or use /submit-link and /submit-note to add to the funnel.
 
-=== SUBMISSIONS ===
+=== CURRENT KNOWLEDGE BASE ===
 ${context}`,
       },
       {

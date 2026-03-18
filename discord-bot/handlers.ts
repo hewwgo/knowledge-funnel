@@ -8,6 +8,7 @@ import {
 import {
   findOrCreateProfile,
   createSubmission,
+  checkDuplicateUrl,
   fetchAndExtractUrl,
   extractPaperMetadata,
   getCycleStats,
@@ -36,6 +37,15 @@ export async function handleSubmitLink(
   }
 
   try {
+    // Check for duplicate URL
+    const duplicate = await checkDuplicateUrl(url);
+    if (duplicate) {
+      await interaction.editReply(
+        `This link has already been submitted: **${duplicate.title}** (contributed by ${duplicate.contributorName}).`
+      );
+      return;
+    }
+
     const displayName =
       interaction.member && "displayName" in interaction.member
         ? (interaction.member.displayName as string)
@@ -78,6 +88,7 @@ export async function handleSubmitLink(
       body: parts.join("\n\n"),
       authors: metadata.authors,
       year: metadata.year,
+      sourceUrl: url,
     });
 
     const embed = new EmbedBuilder()
