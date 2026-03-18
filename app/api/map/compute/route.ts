@@ -4,6 +4,8 @@ import { extractConcepts } from "@/lib/concepts";
 
 export const maxDuration = 60;
 
+const BATCH_SIZE = 5; // Process max 5 submissions per invocation
+
 export async function POST() {
   try {
     const supabase = getSupabaseAdmin();
@@ -32,27 +34,40 @@ export async function POST() {
 
     const needsExtraction = submissions.filter((s) => !processedIds.has(s.id));
 
-    // 3. Extract concepts for unprocessed submissions
+    if (needsExtraction.length === 0) {
+      return NextResponse.json({
+        success: true,
+        submissionCount: submissions.length,
+        processed: 0,
+        remaining: 0,
+        newConcepts: 0,
+        newEdges: 0,
+      });
+    }
+
+    // 3. Only process a batch to stay within timeout
+    const batch = needsExtraction.slice(0, BATCH_SIZE);
     let newConcepts = 0;
     let newEdges = 0;
 
-    for (const sub of needsExtraction) {
-      const result = await extractConcepts(sub.title || "", sub.body || "");
+    // Pre-fetch all existing concepts to minimize DB round-trips
+    const { data: allConcepts } = await supabase
+      .from("concepts")
+      .select("id, label");
+    const conceptCache = new Map<string, string>();
+    for (const c of allConcepts || []) {
+      conceptCache.set(c.label, c.id);
+    }
 
+    for (const sub of batch) {
+      const result = await extractConcepts(sub.title || "", sub.body || "");
       if (result.concepts.length === 0) continue;
 
-      // Upsert each concept
-      const conceptIds: Map<string, string> = new Map();
+      // Upsert each concept (use cache first)
+      const conceptIds = new Map<string, string>();
       for (const label of result.concepts) {
-        // Try to find existing concept
-        const { data: existing } = await supabase
-          .from("concepts")
-          .select("id")
-          .eq("label", label)
-          .single();
-
-        if (existing) {
-          conceptIds.set(label, existing.id);
+        if (conceptCache.has(label)) {
+          conceptIds.set(label, conceptCache.get(label)!);
         } else {
           const { data: inserted, error: insertErr } = await supabase
             .from("concepts")
@@ -60,23 +75,27 @@ export async function POST() {
             .select("id")
             .single();
           if (insertErr) {
-            // Might be a race condition / duplicate — try fetching again
+            // Race condition — fetch it
             const { data: retry } = await supabase
               .from("concepts")
               .select("id")
               .eq("label", label)
               .single();
-            if (retry) conceptIds.set(label, retry.id);
+            if (retry) {
+              conceptIds.set(label, retry.id);
+              conceptCache.set(label, retry.id);
+            }
             continue;
           }
           if (inserted) {
             conceptIds.set(label, inserted.id);
+            conceptCache.set(label, inserted.id);
             newConcepts++;
           }
         }
       }
 
-      // Link submission to concepts
+      // Link submission to concepts (single batch upsert)
       const links = Array.from(conceptIds.values()).map((conceptId) => ({
         submission_id: sub.id,
         concept_id: conceptId,
@@ -87,21 +106,20 @@ export async function POST() {
           .upsert(links, { onConflict: "submission_id,concept_id" });
       }
 
-      // Create/update edges between co-occurring concepts
+      // Create edges between co-occurring concepts (batch)
       const conceptLabels = Array.from(conceptIds.keys());
       for (let i = 0; i < conceptLabels.length; i++) {
         for (let j = i + 1; j < conceptLabels.length; j++) {
           const sourceId = conceptIds.get(conceptLabels[i])!;
           const targetId = conceptIds.get(conceptLabels[j])!;
 
-          // Find explicit relationship if one exists
           const rel = result.relationships.find(
             (r) =>
               (r.from === conceptLabels[i] && r.to === conceptLabels[j]) ||
               (r.from === conceptLabels[j] && r.to === conceptLabels[i])
           );
 
-          // Upsert edge — increment weight if it already exists
+          // Check if edge exists
           const { data: existingEdge } = await supabase
             .from("concept_edges")
             .select("id, weight")
@@ -133,10 +151,12 @@ export async function POST() {
       }
     }
 
+    const remaining = needsExtraction.length - batch.length;
     return NextResponse.json({
       success: true,
       submissionCount: submissions.length,
-      processed: needsExtraction.length,
+      processed: batch.length,
+      remaining,
       newConcepts,
       newEdges,
     });

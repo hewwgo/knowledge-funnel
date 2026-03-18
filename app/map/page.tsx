@@ -84,20 +84,25 @@ export default function MapPage() {
     setComputing(true);
     setError(null);
     try {
-      const res = await fetch("/api/map/compute", { method: "POST" });
-      const text = await res.text();
-      let json;
-      try {
-        json = JSON.parse(text);
-      } catch {
-        throw new Error(
-          `Compute returned invalid response (${res.status}): ${text.slice(0, 300)}`
-        );
+      let remaining = 1;
+      while (remaining > 0) {
+        const res = await fetch("/api/map/compute", { method: "POST" });
+        const text = await res.text();
+        let json;
+        try {
+          json = JSON.parse(text);
+        } catch {
+          throw new Error(
+            `Compute returned invalid response (${res.status}): ${text.slice(0, 300)}`
+          );
+        }
+        if (!res.ok) {
+          throw new Error(json.error || `Compute failed (${res.status})`);
+        }
+        remaining = json.remaining || 0;
+        // Refresh data after each batch so user sees progress
+        await fetchData();
       }
-      if (!res.ok) {
-        throw new Error(json.error || `Compute failed (${res.status})`);
-      }
-      await fetchData();
     } catch (e) {
       setError(String(e));
     } finally {
