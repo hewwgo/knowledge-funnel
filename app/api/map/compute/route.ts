@@ -4,7 +4,7 @@ import { extractConcepts } from "@/lib/concepts";
 
 export const maxDuration = 60;
 
-const BATCH_SIZE = 5; // Process max 5 submissions per invocation
+const BATCH_SIZE = 2; // Process max 2 submissions per invocation to stay within 60s
 
 export async function POST() {
   try {

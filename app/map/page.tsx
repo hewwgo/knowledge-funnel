@@ -55,6 +55,7 @@ export default function MapPage() {
   const [hiddenResearchers, setHiddenResearchers] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
   const [computing, setComputing] = useState(false);
+  const [computeProgress, setComputeProgress] = useState("");
 
   const fetchData = useCallback(async () => {
     try {
@@ -83,8 +84,10 @@ export default function MapPage() {
   const handleCompute = async () => {
     setComputing(true);
     setError(null);
+    setComputeProgress("Starting...");
     try {
       let remaining = 1;
+      let totalProcessed = 0;
       while (remaining > 0) {
         const res = await fetch("/api/map/compute", { method: "POST" });
         const text = await res.text();
@@ -100,6 +103,12 @@ export default function MapPage() {
           throw new Error(json.error || `Compute failed (${res.status})`);
         }
         remaining = json.remaining || 0;
+        totalProcessed += json.processed || 0;
+        setComputeProgress(
+          remaining > 0
+            ? `Processed ${totalProcessed}, ${remaining} remaining...`
+            : `Done! ${totalProcessed} submissions processed.`
+        );
         // Refresh data after each batch so user sees progress
         await fetchData();
       }
@@ -107,6 +116,7 @@ export default function MapPage() {
       setError(String(e));
     } finally {
       setComputing(false);
+      setTimeout(() => setComputeProgress(""), 3000);
     }
   };
 
@@ -163,13 +173,18 @@ export default function MapPage() {
             </span>
           )}
         </div>
-        <button
-          className="map-btn"
-          onClick={handleCompute}
-          disabled={computing}
-        >
-          {computing ? "Extracting..." : "Extract Concepts"}
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          {computeProgress && (
+            <span style={{ fontSize: "12px", color: "#666" }}>{computeProgress}</span>
+          )}
+          <button
+            className="map-btn"
+            onClick={handleCompute}
+            disabled={computing}
+          >
+            {computing ? "Extracting..." : "Extract Concepts"}
+          </button>
+        </div>
       </header>
 
       {isEmpty ? (
