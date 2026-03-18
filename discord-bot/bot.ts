@@ -53,6 +53,10 @@ const client = new Client({
   partials: [Partials.Channel],
 });
 
+// Prevent unhandled errors from crashing the bot
+client.on("error", (err) => console.error("Client error:", err));
+process.on("unhandledRejection", (err) => console.error("Unhandled rejection:", err));
+
 client.once(Events.ClientReady, (c) => {
   console.log(`Bot online as ${c.user.tag} (PID ${process.pid})`);
 
@@ -66,32 +70,46 @@ client.once(Events.ClientReady, (c) => {
 
 // --- Slash Commands ---
 
+const processedInteractions = new Set<string>();
+
 client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
-  // Restrict slash commands to the configured channel
+  // Deduplicate interactions
+  if (processedInteractions.has(interaction.id)) return;
+  processedInteractions.add(interaction.id);
+  if (processedInteractions.size > 500) processedInteractions.clear();
+
+  // Allow slash commands in DMs and the configured channel
   const channelId = process.env.DISCORD_CHANNEL_ID;
-  if (channelId && interaction.channelId !== channelId) {
-    await interaction.reply({
-      content: `This command only works in <#${channelId}>.`,
-      flags: ["Ephemeral"],
-    });
+  const isDM = !interaction.guildId;
+  if (!isDM && channelId && interaction.channelId !== channelId) {
+    try {
+      await interaction.reply({
+        content: `This command only works in <#${channelId}> or in DMs with me.`,
+        flags: ["Ephemeral"],
+      });
+    } catch {}
     return;
   }
 
-  switch (interaction.commandName) {
-    case "submit-link":
-      await handleSubmitLink(interaction);
-      break;
-    case "submit-note":
-      await handleSubmitNote(interaction);
-      break;
-    case "funnel-status":
-      await handleFunnelStatus(interaction);
-      break;
-    case "my-submissions":
-      await handleMySubmissions(interaction);
-      break;
+  try {
+    switch (interaction.commandName) {
+      case "submit-link":
+        await handleSubmitLink(interaction);
+        break;
+      case "submit-note":
+        await handleSubmitNote(interaction);
+        break;
+      case "funnel-status":
+        await handleFunnelStatus(interaction);
+        break;
+      case "my-submissions":
+        await handleMySubmissions(interaction);
+        break;
+    }
+  } catch (err) {
+    console.error(`Command ${interaction.commandName} error:`, err);
   }
 });
 

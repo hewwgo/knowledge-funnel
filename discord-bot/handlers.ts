@@ -156,7 +156,12 @@ export async function handleSubmitLink(
 export async function handleSubmitNote(
   interaction: ChatInputCommandInteraction
 ) {
-  await interaction.deferReply();
+  console.log(`submit-note: guild=${interaction.guildId}, channel=${interaction.channelId}, deferred=${interaction.deferred}, replied=${interaction.replied}`);
+  if (interaction.deferred || interaction.replied) {
+    console.log("submit-note: already acknowledged, skipping deferReply");
+  } else {
+    await interaction.deferReply();
+  }
 
   const text = interaction.options.getString("text", true);
   const type = (interaction.options.getString("type") || "note") as
