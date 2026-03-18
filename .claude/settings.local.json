@@ -18,7 +18,28 @@
       "Bash(rm components/PrismaticBurst.tsx)",
       "Bash(npm uninstall ogl)",
       "WebFetch(domain:www.freepik.com)",
-      "Bash(npm install ogl@^1.0.11)"
+      "Bash(npm install ogl@^1.0.11)",
+      "Bash(grep -r \"export.*interface\\\\|export.*type\\\\|export.*enum\" /c/Users/au806091/knowledge-funnel/app /c/Users/au806091/knowledge-funnel/lib /c/Users/au806091/knowledge-funnel/components --include=*.ts --include=*.tsx)",
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run:*)",
+      "Bash(tasklist)",
+      "Bash(wmic process:*)",
+      "Bash(powershell -Command \"Get-Process node -ErrorAction SilentlyContinue | ForEach-Object { $_Id.ToString\\(\\) + '''' '''' + $_Path }\")",
+      "Bash(taskkill //F //PID 20888 //PID 16860 //PID 10228 //PID 29544 //PID 27200 //PID 28500 //PID 12600 //PID 29268)",
+      "Bash(taskkill //F //IM node.exe)",
+      "Bash(npx tsx:*)",
+      "Bash(node -e \":*)",
+      "Read(//mnt/c/Users/au806091/knowledge-funnel/**)",
+      "Bash(taskkill //F //PID 26264)",
+      "Bash(taskkill //F //PID 14012)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(taskkill //F //PID 29016)",
+      "Bash(taskkill //F //PID 13996)",
+      "Bash(taskkill //PID 28348 //F)",
+      "Bash(node -e \"const e = require\\(''dotenv''\\).config\\(\\).parsed; Object.keys\\(e\\).forEach\\(k => console.log\\(k + '' = '' + e[k].slice\\(0,8\\) + ''...''\\)\\)\")",
+      "Bash(git push:*)"
     ]
   }
 }

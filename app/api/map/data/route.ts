@@ -1,21 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
-interface MapFragment {
-  id: unknown;
-  content: string;
-  fullContent: string;
-  submitterId: string;
-  submitterName: string;
-  submitterColor: string;
-  documentTitle: string;
-  x: number;
-  y: number;
-  clusterId: number | null;
-  tags: string[];
-  createdAt: unknown;
-}
-
 // Colorblind-safe palette (Okabe-Ito)
 const RESEARCHER_COLORS = [
   "#E69F00", "#56B4E9", "#009E73", "#F0E442",
@@ -27,111 +12,154 @@ export async function GET() {
   try {
     const supabase = getSupabaseAdmin();
 
-    // Fetch projections with submission + profile data
-    const { data: projections, error: projError } = await supabase
-      .from("projection_cache")
+    // 1. Fetch all concepts
+    const { data: concepts, error: cErr } = await supabase
+      .from("concepts")
+      .select("id, label");
+    if (cErr) throw cErr;
+    if (!concepts || concepts.length === 0) {
+      return NextResponse.json({
+        nodes: [],
+        edges: [],
+        submissions: [],
+        researchers: [],
+      });
+    }
+
+    // 2. Fetch all submission-concept links with submission + profile
+    const { data: links, error: lErr } = await supabase
+      .from("submission_concepts")
       .select(`
-        submission_id, x, y, cluster_id, computed_at,
+        concept_id,
         submissions!inner (
           id, title, body, content_type, profile_id, created_at,
           profiles!inner ( id, name )
         )
-      `)
-      .order("computed_at", { ascending: false });
+      `);
+    if (lErr) throw lErr;
 
-    if (projError) throw projError;
-    if (!projections || projections.length === 0) {
-      return NextResponse.json({
-        fragments: [],
-        clusters: [],
-        researchers: [],
-        computedAt: null,
-      });
-    }
+    // 3. Fetch all edges
+    const { data: edges, error: eErr } = await supabase
+      .from("concept_edges")
+      .select("source_id, target_id, relation, weight");
+    if (eErr) throw eErr;
 
-    // Fetch all tags
-    const { data: allTags } = await supabase
-      .from("submission_tags")
-      .select("submission_id, tag");
-    const tagsBySubmission = new Map<string, string[]>();
-    for (const t of allTags || []) {
-      const existing = tagsBySubmission.get(t.submission_id) || [];
-      existing.push(t.tag);
-      tagsBySubmission.set(t.submission_id, existing);
-    }
-
-    // Fetch cluster labels
-    const { data: clusterLabelsData } = await supabase
-      .from("cluster_labels")
-      .select("cluster_id, label, representative_submission_ids");
-    const clusterLabelMap = new Map<number, string>();
-    for (const cl of clusterLabelsData || []) {
-      clusterLabelMap.set(cl.cluster_id, cl.label);
-    }
-
-    // Build researcher color map
-    const researcherMap = new Map<string, { id: string; name: string; color: string; fragmentCount: number }>();
+    // 4. Build researcher color map
+    const researcherMap = new Map<string, { id: string; name: string; color: string; submissionCount: number }>();
     let colorIndex = 0;
 
-    // Build fragments array
-    const fragments: MapFragment[] = projections.map((p: Record<string, unknown>) => {
-      const sub = p.submissions as Record<string, unknown>;
-      const profile = sub.profiles as { id: string; name: string };
+    // 5. Build concept → submissions mapping
+    const conceptSubmissions = new Map<string, Set<string>>();
+    const conceptResearchers = new Map<string, Set<string>>();
+    const submissionMap = new Map<string, {
+      id: string;
+      title: string;
+      body: string;
+      contentType: string;
+      submitterId: string;
+      submitterName: string;
+      submitterColor: string;
+      concepts: string[];
+      createdAt: string;
+    }>();
 
+    for (const link of links || []) {
+      const sub = link.submissions as unknown as {
+        id: string;
+        title: string;
+        body: string;
+        content_type: string;
+        profile_id: string;
+        created_at: string;
+        profiles: { id: string; name: string };
+      };
+      const profile = sub.profiles;
+      const conceptId = link.concept_id;
+
+      // Register researcher
       if (!researcherMap.has(profile.id)) {
         researcherMap.set(profile.id, {
           id: profile.id,
           name: profile.name,
           color: RESEARCHER_COLORS[colorIndex % RESEARCHER_COLORS.length],
-          fragmentCount: 0,
+          submissionCount: 0,
         });
         colorIndex++;
       }
       const researcher = researcherMap.get(profile.id)!;
-      researcher.fragmentCount++;
 
-      const body = (sub.body as string) || "";
+      // Track concept → submissions
+      if (!conceptSubmissions.has(conceptId)) {
+        conceptSubmissions.set(conceptId, new Set());
+      }
+      conceptSubmissions.get(conceptId)!.add(sub.id);
 
-      return {
-        id: sub.id,
-        content: body.slice(0, 200),
-        fullContent: body,
-        submitterId: profile.id,
-        submitterName: profile.name,
-        submitterColor: researcher.color,
-        documentTitle: (sub.title as string) || "",
-        x: p.x as number,
-        y: p.y as number,
-        clusterId: p.cluster_id as number | null,
-        tags: tagsBySubmission.get(sub.id as string) || [],
-        createdAt: sub.created_at,
-      };
-    });
+      // Track concept → researchers
+      if (!conceptResearchers.has(conceptId)) {
+        conceptResearchers.set(conceptId, new Set());
+      }
+      conceptResearchers.get(conceptId)!.add(profile.id);
 
-    // Build clusters array
-    const clusterGroups = new Map<number, MapFragment[]>();
-    for (const f of fragments) {
-      const cid = f.clusterId as number;
-      if (cid === null || cid === undefined || cid === -1) continue;
-      const existing = clusterGroups.get(cid) || [];
-      existing.push(f);
-      clusterGroups.set(cid, existing);
+      // Build submission record
+      if (!submissionMap.has(sub.id)) {
+        researcher.submissionCount++;
+        submissionMap.set(sub.id, {
+          id: sub.id,
+          title: sub.title || "",
+          body: (sub.body || "").slice(0, 300),
+          contentType: sub.content_type,
+          submitterId: profile.id,
+          submitterName: profile.name,
+          submitterColor: researcher.color,
+          concepts: [],
+          createdAt: sub.created_at,
+        });
+      }
+
+      // Add concept label to submission
+      const concept = concepts.find((c) => c.id === conceptId);
+      if (concept) {
+        const existing = submissionMap.get(sub.id)!;
+        if (!existing.concepts.includes(concept.label)) {
+          existing.concepts.push(concept.label);
+        }
+      }
     }
 
-    const clusters = Array.from(clusterGroups.entries()).map(([id, members]) => ({
-      id,
-      label: clusterLabelMap.get(id) || "Unlabeled",
-      centroidX: members.reduce((sum, m) => sum + m.x, 0) / members.length,
-      centroidY: members.reduce((sum, m) => sum + m.y, 0) / members.length,
-      memberCount: members.length,
-      submitterIds: [...new Set(members.map((m) => m.submitterId))],
-    }));
+    // 6. Build nodes array
+    const nodes = concepts
+      .filter((c) => conceptSubmissions.has(c.id))
+      .map((c) => {
+        const researcherIds = Array.from(conceptResearchers.get(c.id) || []);
+        const researcherColors = researcherIds
+          .map((rid) => researcherMap.get(rid)?.color || "#999999");
+
+        return {
+          id: c.id,
+          label: c.label,
+          submissionCount: conceptSubmissions.get(c.id)?.size || 0,
+          researcherIds,
+          researcherColors,
+          isShared: researcherIds.length > 1,
+        };
+      });
+
+    // 7. Build edges array
+    const nodeIds = new Set(nodes.map((n) => n.id));
+    const graphEdges = (edges || [])
+      .filter((e) => nodeIds.has(e.source_id) && nodeIds.has(e.target_id))
+      .map((e) => ({
+        source: e.source_id,
+        target: e.target_id,
+        relation: e.relation || "co-occurs",
+        weight: e.weight || 1,
+      }));
 
     return NextResponse.json({
-      fragments,
-      clusters,
+      nodes,
+      edges: graphEdges,
+      submissions: Array.from(submissionMap.values()),
       researchers: Array.from(researcherMap.values()),
-      computedAt: projections[0]?.computed_at || null,
     });
   } catch (error) {
     console.error("Map data error:", error);

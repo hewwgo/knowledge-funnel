@@ -4,16 +4,13 @@ interface Researcher {
   id: string;
   name: string;
   color: string;
-  fragmentCount: number;
+  submissionCount: number;
 }
 
 interface Props {
   researchers: Researcher[];
   hiddenResearchers: Set<string>;
   toggleResearcher: (id: string) => void;
-  allTags: string[];
-  selectedTags: Set<string>;
-  toggleTag: (tag: string) => void;
   searchQuery: string;
   setSearchQuery: (q: string) => void;
 }
@@ -22,9 +19,6 @@ export default function MapControls({
   researchers,
   hiddenResearchers,
   toggleResearcher,
-  allTags,
-  selectedTags,
-  toggleTag,
   searchQuery,
   setSearchQuery,
 }: Props) {
@@ -35,7 +29,7 @@ export default function MapControls({
         <input
           type="text"
           className="map-search"
-          placeholder="Search fragments..."
+          placeholder="Search concepts..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
@@ -57,30 +51,31 @@ export default function MapControls({
                   style={{ background: r.color }}
                 />
                 <span className="map-researcher-name">{r.name}</span>
-                <span className="map-researcher-count">{r.fragmentCount}</span>
+                <span className="map-researcher-count">{r.submissionCount}</span>
               </button>
             </li>
           ))}
         </ul>
       </div>
 
-      {/* Tags */}
-      {allTags.length > 0 && (
-        <div className="map-controls-section">
-          <h3 className="map-controls-heading">Tags</h3>
-          <div className="map-tag-list">
-            {allTags.map((tag) => (
-              <button
-                key={tag}
-                className={`map-tag-chip ${selectedTags.has(tag) ? "map-tag-chip-active" : ""}`}
-                onClick={() => toggleTag(tag)}
-              >
-                {tag}
-              </button>
-            ))}
+      {/* Legend */}
+      <div className="map-controls-section">
+        <h3 className="map-controls-heading">Legend</h3>
+        <div className="map-legend">
+          <div className="map-legend-item">
+            <span className="map-legend-circle map-legend-single" />
+            <span className="map-legend-text">Single researcher</span>
+          </div>
+          <div className="map-legend-item">
+            <span className="map-legend-circle map-legend-shared" />
+            <span className="map-legend-text">Shared interest</span>
+          </div>
+          <div className="map-legend-item">
+            <span className="map-legend-line" />
+            <span className="map-legend-text">Co-occurrence</span>
           </div>
         </div>
-      )}
+      </div>
     </aside>
   );
 }

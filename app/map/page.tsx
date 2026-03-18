@@ -1,55 +1,58 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import KnowledgeMap from "./components/KnowledgeMap";
+import KnowledgeGraph from "./components/KnowledgeGraph";
 import MapControls from "./components/MapControls";
-import FragmentDetail from "./components/FragmentDetail";
+import ConceptDetail from "./components/ConceptDetail";
 
-interface Fragment {
+export interface GraphNode {
   id: string;
-  content: string;
-  fullContent: string;
+  label: string;
+  submissionCount: number;
+  researcherIds: string[];
+  researcherColors: string[];
+  isShared: boolean;
+}
+
+export interface GraphEdge {
+  source: string;
+  target: string;
+  relation: string;
+  weight: number;
+}
+
+export interface Submission {
+  id: string;
+  title: string;
+  body: string;
+  contentType: string;
   submitterId: string;
   submitterName: string;
   submitterColor: string;
-  documentTitle: string;
-  x: number;
-  y: number;
-  clusterId: number | null;
-  tags: string[];
+  concepts: string[];
   createdAt: string;
 }
 
-interface Cluster {
-  id: number;
-  label: string;
-  centroidX: number;
-  centroidY: number;
-  memberCount: number;
-  submitterIds: string[];
-}
-
-interface Researcher {
+export interface Researcher {
   id: string;
   name: string;
   color: string;
-  fragmentCount: number;
+  submissionCount: number;
 }
 
-export interface MapData {
-  fragments: Fragment[];
-  clusters: Cluster[];
+export interface GraphData {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  submissions: Submission[];
   researchers: Researcher[];
-  computedAt: string | null;
 }
 
 export default function MapPage() {
-  const [data, setData] = useState<MapData | null>(null);
+  const [data, setData] = useState<GraphData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedFragmentId, setSelectedFragmentId] = useState<string | null>(null);
+  const [selectedConceptId, setSelectedConceptId] = useState<string | null>(null);
   const [hiddenResearchers, setHiddenResearchers] = useState<Set<string>>(new Set());
-  const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
   const [computing, setComputing] = useState(false);
 
@@ -79,6 +82,7 @@ export default function MapPage() {
 
   const handleCompute = async () => {
     setComputing(true);
+    setError(null);
     try {
       const res = await fetch("/api/map/compute", { method: "POST" });
       const text = await res.text();
@@ -86,7 +90,9 @@ export default function MapPage() {
       try {
         json = JSON.parse(text);
       } catch {
-        throw new Error(`Compute returned invalid response (${res.status}): ${text.slice(0, 300)}`);
+        throw new Error(
+          `Compute returned invalid response (${res.status}): ${text.slice(0, 300)}`
+        );
       }
       if (!res.ok) {
         throw new Error(json.error || `Compute failed (${res.status})`);
@@ -108,24 +114,10 @@ export default function MapPage() {
     });
   };
 
-  const toggleTag = (tag: string) => {
-    setSelectedTags((prev) => {
-      const next = new Set(prev);
-      if (next.has(tag)) next.delete(tag);
-      else next.add(tag);
-      return next;
-    });
-  };
-
-  // Collect all unique tags
-  const allTags = data
-    ? [...new Set(data.fragments.flatMap((f) => f.tags))].sort()
-    : [];
-
   if (loading) {
     return (
       <div className="map-page">
-        <div className="map-empty">Loading map data...</div>
+        <div className="map-empty">Loading graph data...</div>
       </div>
     );
   }
@@ -143,7 +135,15 @@ export default function MapPage() {
     );
   }
 
-  const isEmpty = !data || data.fragments.length === 0;
+  const isEmpty = !data || data.nodes.length === 0;
+
+  // Get selected concept data for detail panel
+  const selectedConcept = data?.nodes.find((n) => n.id === selectedConceptId) || null;
+  const selectedSubmissions = selectedConcept
+    ? (data?.submissions || []).filter((s) =>
+        s.concepts.includes(selectedConcept.label)
+      )
+    : [];
 
   return (
     <div className="map-page">
@@ -151,10 +151,10 @@ export default function MapPage() {
       <header className="map-header">
         <div className="map-header-left">
           <a href="/" className="map-back">&larr;</a>
-          <h1 className="map-title">Knowledge Map</h1>
-          {data?.computedAt && (
+          <h1 className="map-title">Knowledge Graph</h1>
+          {data && data.nodes.length > 0 && (
             <span className="map-computed-at">
-              Computed {new Date(data.computedAt).toLocaleDateString()}
+              {data.nodes.length} concepts &middot; {data.edges.length} connections
             </span>
           )}
         </div>
@@ -163,18 +163,23 @@ export default function MapPage() {
           onClick={handleCompute}
           disabled={computing}
         >
-          {computing ? "Computing..." : "Recompute Map"}
+          {computing ? "Extracting..." : "Extract Concepts"}
         </button>
       </header>
 
       {isEmpty ? (
         <div className="map-empty">
-          <p>No map data yet.</p>
+          <p>No concepts extracted yet.</p>
           <p className="map-empty-sub">
-            Submit documents to the funnel, then hit &ldquo;Recompute Map&rdquo; to generate the projection.
+            Submit documents to the funnel, then hit &ldquo;Extract Concepts&rdquo;
+            to build the knowledge graph.
           </p>
-          <button className="map-btn" onClick={handleCompute} disabled={computing}>
-            {computing ? "Computing..." : "Compute Now"}
+          <button
+            className="map-btn"
+            onClick={handleCompute}
+            disabled={computing}
+          >
+            {computing ? "Extracting..." : "Extract Now"}
           </button>
         </div>
       ) : (
@@ -183,27 +188,27 @@ export default function MapPage() {
             researchers={data!.researchers}
             hiddenResearchers={hiddenResearchers}
             toggleResearcher={toggleResearcher}
-            allTags={allTags}
-            selectedTags={selectedTags}
-            toggleTag={toggleTag}
             searchQuery={searchQuery}
             setSearchQuery={setSearchQuery}
           />
           <div className="map-canvas-container">
-            <KnowledgeMap
+            <KnowledgeGraph
               data={data!}
               hiddenResearchers={hiddenResearchers}
-              selectedTags={selectedTags}
               searchQuery={searchQuery}
-              onSelectFragment={setSelectedFragmentId}
-              selectedFragmentId={selectedFragmentId}
+              onSelectConcept={setSelectedConceptId}
+              selectedConceptId={selectedConceptId}
             />
           </div>
-          {selectedFragmentId && (
-            <FragmentDetail
-              fragmentId={selectedFragmentId}
-              onClose={() => setSelectedFragmentId(null)}
-              onNavigate={setSelectedFragmentId}
+          {selectedConcept && (
+            <ConceptDetail
+              concept={selectedConcept}
+              submissions={selectedSubmissions}
+              researchers={data!.researchers}
+              onClose={() => setSelectedConceptId(null)}
+              onNavigate={setSelectedConceptId}
+              allNodes={data!.nodes}
+              edges={data!.edges}
             />
           )}
         </div>
