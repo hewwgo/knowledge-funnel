@@ -342,20 +342,20 @@ async function llmExtractConcepts(title, body) {
             },
             {
                 role: "user",
-                content: `Extract key concepts from this research content at two levels:
+                content: `Extract key concepts from this research content. Be CONCISE — fewer, broader concepts are better than many narrow ones.
 
-BROAD (1-2 concepts): High-level research fields or domains that many researchers might share. Examples: "human-computer interaction", "machine learning", "natural language processing", "computer vision". Use 1-3 words.
+BROAD (exactly 1 concept): The single most fitting high-level research field. STRONGLY prefer these standard labels: "human-computer interaction", "machine learning", "artificial intelligence", "natural language processing", "computer vision", "information retrieval", "data visualization", "robotics", "accessibility", "collaborative systems", "social computing", "ubiquitous computing". Only create a new broad label if none of these fit.
 
-SPECIFIC (3-5 concepts): Narrower methods, techniques, applications, or topics unique to this work. Examples: "eye tracking", "transformer architecture", "prompt engineering", "crowdsourcing". Use 1-4 words.
+SPECIFIC (2-3 concepts): The key methods, techniques, or applications. Be selective — only the most distinctive aspects of this work.
 
-Also identify meaningful semantic relationships between concepts. Only include relationships that represent genuine connections, NOT every possible pair. Max 5 relationships.
+Relationships: Only include 1-3 genuinely meaningful connections. Every specific concept should have a "part of" relationship to its broad concept.
 
-Return JSON in this exact format:
-{"concepts": [{"label": "machine learning", "level": "broad"}, {"label": "transfer learning", "level": "specific"}], "relationships": [{"from": "transfer learning", "to": "machine learning", "relation": "part of"}]}
+Return JSON:
+{"concepts": [{"label": "human-computer interaction", "level": "broad"}, {"label": "eye tracking", "level": "specific"}], "relationships": [{"from": "eye tracking", "to": "human-computer interaction", "relation": "part of"}]}
 
 Relationship types: "uses", "extends", "applied to", "enables", "contrasts with", "part of", "evaluates"
 
-Normalize all concept labels to lowercase.
+Normalize all labels to lowercase. Max 4 concepts total.
 
 Content:
 ${text}`,
