@@ -167,35 +167,37 @@ export async function POST() {
       if (insertErr) throw insertErr;
     }
 
-    // 8. Generate cluster labels
+    // 8. Generate cluster labels (parallel to stay within timeout)
     const clusterIds = [...new Set(clusterAssignments.filter((c) => c >= 0))];
     await supabase.from("cluster_labels").delete().neq("cluster_id", -999);
 
-    for (const clusterId of clusterIds) {
-      const memberIndices = clusterAssignments
-        .map((c, i) => (c === clusterId ? i : -1))
-        .filter((i) => i >= 0);
+    await Promise.all(
+      clusterIds.map(async (clusterId) => {
+        const memberIndices = clusterAssignments
+          .map((c, i) => (c === clusterId ? i : -1))
+          .filter((i) => i >= 0);
 
-      const memberTexts = memberIndices.map((i) => {
-        const s = withEmbeddings[i];
-        return `${s.title || ""}: ${(s.body || "").slice(0, 300)}`;
-      });
+        const memberTexts = memberIndices.map((i) => {
+          const s = withEmbeddings[i];
+          return `${s.title || ""}: ${(s.body || "").slice(0, 300)}`;
+        });
 
-      const label = await generateClusterLabel(memberTexts.slice(0, 5));
+        const label = await generateClusterLabel(memberTexts.slice(0, 5));
 
-      const representativeIds = memberIndices
-        .slice(0, 3)
-        .map((i) => withEmbeddings[i].id);
+        const representativeIds = memberIndices
+          .slice(0, 3)
+          .map((i) => withEmbeddings[i].id);
 
-      await supabase.from("cluster_labels").upsert(
-        {
-          cluster_id: clusterId,
-          label,
-          representative_submission_ids: representativeIds,
-        },
-        { onConflict: "cluster_id" }
-      );
-    }
+        await supabase.from("cluster_labels").upsert(
+          {
+            cluster_id: clusterId,
+            label,
+            representative_submission_ids: representativeIds,
+          },
+          { onConflict: "cluster_id" }
+        );
+      })
+    );
 
     return NextResponse.json({
       success: true,
