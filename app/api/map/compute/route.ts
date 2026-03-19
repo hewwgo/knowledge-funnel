@@ -204,8 +204,9 @@ export async function POST() {
       projectedCount: projections.length,
       clusterCount: clusterIds.length,
     });
-  } catch (error) {
-    console.error("Map compute error:", error);
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : JSON.stringify(error);
+    console.error("Map compute error:", msg, error);
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

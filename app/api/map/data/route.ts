@@ -127,8 +127,9 @@ export async function GET() {
       researchers: Array.from(researcherMap.values()),
       computedAt: projections[0]?.computed_at || null,
     });
-  } catch (error) {
-    console.error("Map data error:", error);
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : JSON.stringify(error);
+    console.error("Map data error:", msg, error);
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
