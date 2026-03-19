@@ -682,6 +682,48 @@ export async function extractAndLinkConcepts(
 export async function fetchAndExtractUrl(
   url: string
 ): Promise<Metadata> {
+  // For arxiv URLs, always use the abs page (not pdf) for reliable metadata
+  const arxivMatch = url.match(/arxiv\.org\/(?:abs|pdf|html)\/(\d+\.\d+)/);
+  if (arxivMatch) {
+    const arxivId = arxivMatch[1];
+    const absUrl = `https://arxiv.org/abs/${arxivId}`;
+    try {
+      // Try the arxiv API first for reliable structured data
+      const apiRes = await fetch(`http://export.arxiv.org/api/query?id_list=${arxivId}`, {
+        signal: AbortSignal.timeout(10000),
+      });
+      if (apiRes.ok) {
+        const xml = await apiRes.text();
+        const titleMatch = xml.match(/<title>([\s\S]*?)<\/title>/g);
+        const title = titleMatch && titleMatch.length > 1
+          ? titleMatch[1].replace(/<\/?title>/g, "").trim().replace(/\s+/g, " ")
+          : "";
+        const summaryMatch = xml.match(/<summary>([\s\S]*?)<\/summary>/);
+        const abstract = summaryMatch
+          ? summaryMatch[1].trim().replace(/\s+/g, " ")
+          : "";
+        const authorMatches = [...xml.matchAll(/<name>([\s\S]*?)<\/name>/g)];
+        const authors = authorMatches.map(m => m[1].trim()).join(", ");
+        const yearMatch = xml.match(/<published>(\d{4})/);
+        const year = yearMatch ? parseInt(yearMatch[1]) : null;
+
+        if (title) {
+          return {
+            title,
+            authors,
+            year,
+            abstract,
+            keywords: [],
+          };
+        }
+      }
+    } catch (err) {
+      console.warn("Arxiv API failed, falling back to HTML:", err);
+    }
+    // Fall back to fetching the abs page
+    url = absUrl;
+  }
+
   const res = await fetch(url, {
     headers: {
       "User-Agent":
