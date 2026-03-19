@@ -205,39 +205,9 @@ export default function MapPage() {
           </div>
           {selectedNode && (
             <ConceptDetail
-              concept={{
-                id: selectedNode.id,
-                label: selectedNode.title,
-                level: "specific",
-                submissionCount: 1,
-                researcherIds: [selectedNode.submitterId],
-                researcherColors: [selectedNode.submitterColor],
-                isShared: false,
-              }}
-              submissions={[{
-                id: selectedNode.id,
-                title: selectedNode.title,
-                body: selectedNode.body,
-                contentType: selectedNode.contentType,
-                submitterId: selectedNode.submitterId,
-                submitterName: selectedNode.submitterName,
-                submitterColor: selectedNode.submitterColor,
-                concepts: selectedNode.concepts,
-                createdAt: selectedNode.createdAt,
-              }]}
+              node={selectedNode}
               researchers={data!.researchers}
               onClose={() => setSelectedNodeId(null)}
-              onNavigate={setSelectedNodeId}
-              allNodes={data!.nodes.map((n) => ({
-                id: n.id,
-                label: n.title,
-                level: "specific" as const,
-                submissionCount: 1,
-                researcherIds: [n.submitterId],
-                researcherColors: [n.submitterColor],
-                isShared: false,
-              }))}
-              edges={[]}
             />
           )}
         </div>
