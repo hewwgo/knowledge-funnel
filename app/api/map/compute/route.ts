@@ -60,7 +60,8 @@ export async function POST() {
     }
 
     for (const sub of batch) {
-      const result = await extractConcepts(sub.title || "", sub.body || "");
+      const existingLabels = Array.from(conceptCache.keys());
+      const result = await extractConcepts(sub.title || "", sub.body || "", existingLabels);
       if (result.concepts.length === 0) continue;
 
       // Upsert each concept (use cache first)

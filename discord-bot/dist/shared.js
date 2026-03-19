@@ -331,8 +331,11 @@ ${context}`,
     });
     return response.choices[0]?.message?.content || "I couldn't generate a response. Try again.";
 }
-async function llmExtractConcepts(title, body) {
+async function llmExtractConcepts(title, body, existingConcepts) {
     const text = `${title || ""}\n\n${body || ""}`.trim().slice(0, 4000);
+    const existingSection = existingConcepts && existingConcepts.length > 0
+        ? `\n\nEXISTING CONCEPTS IN THE KNOWLEDGE BASE:\n${existingConcepts.join(", ")}\n\nYou MUST reuse an existing concept if the meaning is similar. Do NOT create "reflective friction" if "reflective design" exists — use the existing one. Only create a new specific concept if nothing in the list above covers it.`
+        : "";
     const response = await getLLM().chat.completions.create({
         model: "deepseek-chat",
         messages: [
@@ -346,16 +349,16 @@ async function llmExtractConcepts(title, body) {
 
 BROAD (exactly 1 concept): The single most fitting high-level research field. STRONGLY prefer these standard labels: "human-computer interaction", "machine learning", "artificial intelligence", "natural language processing", "computer vision", "information retrieval", "data visualization", "robotics", "accessibility", "collaborative systems", "social computing", "ubiquitous computing". Only create a new broad label if none of these fit.
 
-SPECIFIC (2-3 concepts): The key methods, techniques, or applications. Be selective — only the most distinctive aspects of this work.
+SPECIFIC (1-2 concepts): The key methods, techniques, or applications. Be very selective — only the most distinctive aspect of this work. Prefer reusing existing concepts over creating new ones.${existingSection}
 
-Relationships: Only include 1-3 genuinely meaningful connections. Every specific concept should have a "part of" relationship to its broad concept.
+Relationships: Only include 1-2 genuinely meaningful connections. Every specific concept should have a "part of" relationship to its broad concept.
 
 Return JSON:
 {"concepts": [{"label": "human-computer interaction", "level": "broad"}, {"label": "eye tracking", "level": "specific"}], "relationships": [{"from": "eye tracking", "to": "human-computer interaction", "relation": "part of"}]}
 
 Relationship types: "uses", "extends", "applied to", "enables", "contrasts with", "part of", "evaluates"
 
-Normalize all labels to lowercase. Max 4 concepts total.
+Normalize all labels to lowercase. Max 3 concepts total.
 
 Content:
 ${text}`,
@@ -407,7 +410,12 @@ ${text}`,
 export async function extractAndLinkConcepts(submissionId, title, body) {
     try {
         const supabase = getSupabase();
-        const result = await llmExtractConcepts(title, body);
+        // Fetch existing concepts so the LLM reuses them instead of creating near-duplicates
+        const { data: existingConcepts } = await supabase
+            .from("concepts")
+            .select("label");
+        const existingLabels = (existingConcepts || []).map((c) => c.label);
+        const result = await llmExtractConcepts(title, body, existingLabels);
         if (result.concepts.length === 0)
             return;
         // Upsert concepts
