@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { generateEmbeddings, generateClusterLabel } from "@/lib/embeddings";
-// @ts-expect-error — umap-js has no type declarations
 import { UMAP } from "umap-js";
-// @ts-expect-error — dbscan has no type declarations
-import { DBSCAN as DBSCANLib } from "dbscan";
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const DBSCANLib = require("dbscan");
 
 export const maxDuration = 60;
 
