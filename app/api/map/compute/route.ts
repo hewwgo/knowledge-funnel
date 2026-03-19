@@ -2,8 +2,56 @@ import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { generateEmbeddings, generateClusterLabel } from "@/lib/embeddings";
 import { UMAP } from "umap-js";
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const DBSCANLib = require("dbscan");
+
+// Simple DBSCAN implementation (the npm package has an incompatible API)
+function dbscan(points: number[][], epsilon: number, minPoints: number): number[] {
+  const n = points.length;
+  const labels = new Array(n).fill(-1); // -1 = noise
+  let clusterId = 0;
+
+  function dist(a: number[], b: number[]) {
+    const dx = a[0] - b[0], dy = a[1] - b[1];
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  function regionQuery(idx: number): number[] {
+    const neighbors: number[] = [];
+    for (let i = 0; i < n; i++) {
+      if (dist(points[idx], points[i]) <= epsilon) neighbors.push(i);
+    }
+    return neighbors;
+  }
+
+  for (let i = 0; i < n; i++) {
+    if (labels[i] !== -1) continue;
+    const neighbors = regionQuery(i);
+    if (neighbors.length < minPoints) continue; // noise
+
+    labels[i] = clusterId;
+    const queue = [...neighbors.filter((j) => j !== i)];
+    const visited = new Set([i]);
+
+    while (queue.length > 0) {
+      const j = queue.shift()!;
+      if (visited.has(j)) continue;
+      visited.add(j);
+
+      if (labels[j] === -1) labels[j] = clusterId; // was noise, claim it
+      if (labels[j] !== -1 && labels[j] !== clusterId) continue; // already in another cluster
+
+      labels[j] = clusterId;
+      const jNeighbors = regionQuery(j);
+      if (jNeighbors.length >= minPoints) {
+        for (const k of jNeighbors) {
+          if (!visited.has(k)) queue.push(k);
+        }
+      }
+    }
+    clusterId++;
+  }
+
+  return labels;
+}
 
 export const maxDuration = 60;
 
@@ -97,14 +145,7 @@ export async function POST() {
     // 6. Run DBSCAN clustering on 2D coordinates
     const epsilon = 80;
     const minPoints = 2;
-    const dbscan = new DBSCANLib();
-    const clusterAssignments: number[] = dbscan.run(normalized, epsilon, minPoints)
-      .reduce((acc: number[], cluster: number[], clusterIdx: number) => {
-        for (const pointIdx of cluster) {
-          acc[pointIdx] = clusterIdx;
-        }
-        return acc;
-      }, new Array(normalized.length).fill(-1));
+    const clusterAssignments = dbscan(normalized, epsilon, minPoints);
 
     // 7. Clear old projections and write new ones
     await supabase.from("projection_cache").delete().neq("submission_id", "00000000-0000-0000-0000-000000000000");
