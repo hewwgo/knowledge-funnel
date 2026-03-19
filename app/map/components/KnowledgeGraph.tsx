@@ -144,6 +144,8 @@ export default function KnowledgeGraph({
         d3.forceCollide<SimNode>().radius((d) => getRadius(d) + 6)
       );
 
+    // Let simulation settle then stop — prevents bouncing on re-render
+    simulation.alphaDecay(0.05);
     simulationRef.current = simulation;
 
     // Draw edges
@@ -378,18 +380,20 @@ export default function KnowledgeGraph({
     // Initial filter + zoom state
     applySemanticZoom(1);
 
-    // Selected node highlight
-    node.select(".graph-node").attr("stroke", (d) =>
-      d.id === selectedConceptId ? "#262624" : "none"
-    ).attr("stroke-width", (d) =>
-      d.id === selectedConceptId ? 3 : 0
-    );
-
     return () => {
       simulation.stop();
       svg.selectAll("*").remove();
     };
-  }, [data, hiddenResearchers, searchQuery, selectedConceptId, isNodeActive, onSelectConcept]);
+  }, [data, hiddenResearchers, searchQuery, isNodeActive, onSelectConcept]);
+
+  // Separate effect for selection highlight — doesn't rebuild the graph
+  useEffect(() => {
+    if (!svgRef.current) return;
+    const svg = d3.select(svgRef.current);
+    svg.selectAll<SVGElement, SimNode>(".graph-node")
+      .attr("stroke", (d) => d.id === selectedConceptId ? "#262624" : "none")
+      .attr("stroke-width", (d) => d.id === selectedConceptId ? 3 : 0);
+  }, [selectedConceptId]);
 
   return (
     <div className="map-canvas">
