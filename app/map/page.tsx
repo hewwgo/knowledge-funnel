@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import KnowledgeGraph from "./components/KnowledgeGraph";
 import MapControls from "./components/MapControls";
 import ConceptDetail from "./components/ConceptDetail";
+import ClusterDetail from "./components/ClusterDetail";
 
 export interface MapNode {
   id: string;
@@ -49,6 +50,7 @@ export default function MapPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [selectedClusterId, setSelectedClusterId] = useState<number | null>(null);
   const [hiddenResearchers, setHiddenResearchers] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
   const [computing, setComputing] = useState(false);
@@ -140,8 +142,20 @@ export default function MapPage() {
 
   const isEmpty = !data || data.nodes.length === 0;
 
-  // Get selected node for detail panel
+  // Selection handlers — selecting one deselects the other
+  const handleSelectNode = (id: string) => {
+    setSelectedNodeId(id);
+    setSelectedClusterId(null);
+  };
+
+  const handleSelectCluster = (id: number) => {
+    setSelectedClusterId(id);
+    setSelectedNodeId(null);
+  };
+
+  // Get selected items for detail panels
   const selectedNode = data?.nodes.find((n) => n.id === selectedNodeId) || null;
+  const selectedCluster = data?.clusters.find((c) => c.id === selectedClusterId) || null;
 
   return (
     <div className="map-page">
@@ -199,8 +213,10 @@ export default function MapPage() {
               data={data!}
               hiddenResearchers={hiddenResearchers}
               searchQuery={searchQuery}
-              onSelectNode={setSelectedNodeId}
+              onSelectNode={handleSelectNode}
               selectedNodeId={selectedNodeId}
+              onSelectCluster={handleSelectCluster}
+              selectedClusterId={selectedClusterId}
             />
           </div>
           {selectedNode && (
@@ -208,6 +224,15 @@ export default function MapPage() {
               node={selectedNode}
               researchers={data!.researchers}
               onClose={() => setSelectedNodeId(null)}
+            />
+          )}
+          {selectedCluster && (
+            <ClusterDetail
+              cluster={selectedCluster}
+              nodes={data!.nodes}
+              researchers={data!.researchers}
+              onClose={() => setSelectedClusterId(null)}
+              onSelectNode={handleSelectNode}
             />
           )}
         </div>

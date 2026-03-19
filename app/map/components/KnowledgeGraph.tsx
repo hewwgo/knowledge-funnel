@@ -10,6 +10,8 @@ interface Props {
   searchQuery: string;
   onSelectNode: (id: string) => void;
   selectedNodeId: string | null;
+  onSelectCluster: (id: number) => void;
+  selectedClusterId: number | null;
 }
 
 export default function KnowledgeGraph({
@@ -18,6 +20,8 @@ export default function KnowledgeGraph({
   searchQuery,
   onSelectNode,
   selectedNodeId,
+  onSelectCluster,
+  selectedClusterId,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
@@ -96,11 +100,16 @@ export default function KnowledgeGraph({
       hullGroup
         .append("path")
         .attr("d", `M${expandedHull.map((p) => p.join(",")).join("L")}Z`)
-        .attr("fill", "rgba(38, 38, 36, 0.04)")
-        .attr("stroke", "rgba(38, 38, 36, 0.15)")
-        .attr("stroke-width", 1)
+        .attr("fill", cluster.id === selectedClusterId ? "rgba(38, 38, 36, 0.1)" : "rgba(38, 38, 36, 0.04)")
+        .attr("stroke", cluster.id === selectedClusterId ? "rgba(38, 38, 36, 0.4)" : "rgba(38, 38, 36, 0.15)")
+        .attr("stroke-width", cluster.id === selectedClusterId ? 2 : 1)
         .attr("stroke-dasharray", "6,3")
-        .attr("class", "cluster-hull");
+        .attr("class", "cluster-hull")
+        .attr("cursor", "pointer")
+        .on("click", (event) => {
+          event.stopPropagation();
+          onSelectCluster(cluster.id);
+        });
 
       // Cluster label
       hullGroup
@@ -108,11 +117,16 @@ export default function KnowledgeGraph({
         .attr("x", xScale(cluster.centroidX))
         .attr("y", yScale(cluster.centroidY) - Math.max(...scaledPoints.map(p => Math.abs(p[1] - yScale(cy)))) - 15)
         .attr("text-anchor", "middle")
-        .attr("fill", "rgba(38, 38, 36, 0.4)")
+        .attr("fill", cluster.id === selectedClusterId ? "rgba(38, 38, 36, 0.8)" : "rgba(38, 38, 36, 0.4)")
         .attr("font-size", "11px")
         .attr("font-weight", "600")
         .attr("font-style", "italic")
         .attr("class", "cluster-label")
+        .attr("cursor", "pointer")
+        .on("click", (event) => {
+          event.stopPropagation();
+          onSelectCluster(cluster.id);
+        })
         .text(cluster.label);
     }
 
@@ -216,7 +230,7 @@ export default function KnowledgeGraph({
     return () => {
       svg.selectAll("*").remove();
     };
-  }, [data, hiddenResearchers, searchQuery, isNodeActive, onSelectNode]);
+  }, [data, hiddenResearchers, searchQuery, isNodeActive, onSelectNode, onSelectCluster, selectedClusterId]);
 
   // Selection highlight (separate effect to avoid full re-render)
   useEffect(() => {
