@@ -420,6 +420,56 @@ ${context}`,
   return response.choices[0]?.message?.content || "I couldn't generate a response. Try again.";
 }
 
+// --- Embedding (auto-runs after submission) ---
+
+/**
+ * Embed a submission's text via Voyage API and store in DB.
+ * Fire-and-forget — errors logged but never thrown.
+ */
+export async function embedSubmission(
+  submissionId: string,
+  title: string,
+  body: string
+): Promise<void> {
+  try {
+    const text = `${title || ""}\n\n${body || ""}`.trim().slice(0, 4000);
+    if (text.length < 20) return;
+
+    const res = await fetch("https://api.voyageai.com/v1/embeddings", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.VOYAGE_API_KEY || ""}`,
+      },
+      body: JSON.stringify({
+        input: [text],
+        model: "voyage-3-lite",
+      }),
+    });
+
+    if (!res.ok) {
+      const errBody = await res.text();
+      console.error(`Voyage API ${res.status}: ${errBody}`);
+      return;
+    }
+
+    const json = await res.json();
+    const embedding = json.data?.[0]?.embedding;
+    if (!embedding) return;
+
+    // Store in Supabase — pgvector expects a JSON array string
+    const supabase = getSupabase();
+    await supabase
+      .from("submissions")
+      .update({ embedding: JSON.stringify(embedding) })
+      .eq("id", submissionId);
+
+    console.log(`Embedded submission ${submissionId.slice(0, 8)}`);
+  } catch (err) {
+    console.error("Embedding failed (non-blocking):", err);
+  }
+}
+
 // --- Concept Extraction (auto-runs after submission) ---
 
 interface ExtractedConcept {

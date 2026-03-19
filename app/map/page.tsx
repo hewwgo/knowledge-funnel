@@ -5,33 +5,29 @@ import KnowledgeGraph from "./components/KnowledgeGraph";
 import MapControls from "./components/MapControls";
 import ConceptDetail from "./components/ConceptDetail";
 
-export interface GraphNode {
-  id: string;
-  label: string;
-  level: "broad" | "specific";
-  submissionCount: number;
-  researcherIds: string[];
-  researcherColors: string[];
-  isShared: boolean;
-}
-
-export interface GraphEdge {
-  source: string;
-  target: string;
-  relation: string;
-  weight: number;
-}
-
-export interface Submission {
+export interface MapNode {
   id: string;
   title: string;
   body: string;
   contentType: string;
+  x: number;
+  y: number;
+  clusterId: number | null;
   submitterId: string;
   submitterName: string;
   submitterColor: string;
   concepts: string[];
   createdAt: string;
+}
+
+export interface Cluster {
+  id: number;
+  label: string;
+  points: [number, number][];
+  centroidX: number;
+  centroidY: number;
+  memberCount: number;
+  submitterIds: string[];
 }
 
 export interface Researcher {
@@ -41,18 +37,18 @@ export interface Researcher {
   submissionCount: number;
 }
 
-export interface GraphData {
-  nodes: GraphNode[];
-  edges: GraphEdge[];
-  submissions: Submission[];
+export interface MapData {
+  nodes: MapNode[];
+  clusters: Cluster[];
   researchers: Researcher[];
+  computedAt: string | null;
 }
 
 export default function MapPage() {
-  const [data, setData] = useState<GraphData | null>(null);
+  const [data, setData] = useState<MapData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedConceptId, setSelectedConceptId] = useState<string | null>(null);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [hiddenResearchers, setHiddenResearchers] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
   const [computing, setComputing] = useState(false);
@@ -85,39 +81,30 @@ export default function MapPage() {
   const handleCompute = async () => {
     setComputing(true);
     setError(null);
-    setComputeProgress("Starting...");
+    setComputeProgress("Computing UMAP projection...");
     try {
-      let remaining = 1;
-      let totalProcessed = 0;
-      while (remaining > 0) {
-        const res = await fetch("/api/map/compute", { method: "POST" });
-        const text = await res.text();
-        let json;
-        try {
-          json = JSON.parse(text);
-        } catch {
-          throw new Error(
-            `Compute returned invalid response (${res.status}): ${text.slice(0, 300)}`
-          );
-        }
-        if (!res.ok) {
-          throw new Error(json.error || `Compute failed (${res.status})`);
-        }
-        remaining = json.remaining || 0;
-        totalProcessed += json.processed || 0;
-        setComputeProgress(
-          remaining > 0
-            ? `Processed ${totalProcessed}, ${remaining} remaining...`
-            : `Done! ${totalProcessed} submissions processed.`
+      const res = await fetch("/api/map/compute", { method: "POST" });
+      const text = await res.text();
+      let json;
+      try {
+        json = JSON.parse(text);
+      } catch {
+        throw new Error(
+          `Compute returned invalid response (${res.status}): ${text.slice(0, 300)}`
         );
-        // Refresh data after each batch so user sees progress
-        await fetchData();
       }
+      if (!res.ok) {
+        throw new Error(json.error || `Compute failed (${res.status})`);
+      }
+      setComputeProgress(
+        `Done! ${json.projectedCount || 0} submissions projected, ${json.clusterCount || 0} clusters found.`
+      );
+      await fetchData();
     } catch (e) {
       setError(String(e));
     } finally {
       setComputing(false);
-      setTimeout(() => setComputeProgress(""), 3000);
+      setTimeout(() => setComputeProgress(""), 4000);
     }
   };
 
@@ -133,7 +120,7 @@ export default function MapPage() {
   if (loading) {
     return (
       <div className="map-page">
-        <div className="map-empty">Loading graph data...</div>
+        <div className="map-empty">Loading map data...</div>
       </div>
     );
   }
@@ -153,13 +140,8 @@ export default function MapPage() {
 
   const isEmpty = !data || data.nodes.length === 0;
 
-  // Get selected concept data for detail panel
-  const selectedConcept = data?.nodes.find((n) => n.id === selectedConceptId) || null;
-  const selectedSubmissions = selectedConcept
-    ? (data?.submissions || []).filter((s) =>
-        s.concepts.includes(selectedConcept.label)
-      )
-    : [];
+  // Get selected node for detail panel
+  const selectedNode = data?.nodes.find((n) => n.id === selectedNodeId) || null;
 
   return (
     <div className="map-page">
@@ -167,10 +149,10 @@ export default function MapPage() {
       <header className="map-header">
         <div className="map-header-left">
           <a href="/" className="map-back">&larr;</a>
-          <h1 className="map-title">Knowledge Graph</h1>
+          <h1 className="map-title">Knowledge Map</h1>
           {data && data.nodes.length > 0 && (
             <span className="map-computed-at">
-              {data.nodes.length} concepts &middot; {data.edges.length} connections
+              {data.nodes.length} submissions &middot; {data.clusters.length} clusters
             </span>
           )}
         </div>
@@ -183,24 +165,24 @@ export default function MapPage() {
             onClick={handleCompute}
             disabled={computing}
           >
-            {computing ? "Extracting..." : "Extract Concepts"}
+            {computing ? "Computing..." : "Recompute Map"}
           </button>
         </div>
       </header>
 
       {isEmpty ? (
         <div className="map-empty">
-          <p>No concepts extracted yet.</p>
+          <p>No map data yet.</p>
           <p className="map-empty-sub">
-            Submit documents to the funnel, then hit &ldquo;Extract Concepts&rdquo;
-            to build the knowledge graph.
+            Submit documents to the funnel, then hit &ldquo;Recompute Map&rdquo;
+            to generate the knowledge map.
           </p>
           <button
             className="map-btn"
             onClick={handleCompute}
             disabled={computing}
           >
-            {computing ? "Extracting..." : "Extract Now"}
+            {computing ? "Computing..." : "Compute Now"}
           </button>
         </div>
       ) : (
@@ -217,19 +199,45 @@ export default function MapPage() {
               data={data!}
               hiddenResearchers={hiddenResearchers}
               searchQuery={searchQuery}
-              onSelectConcept={setSelectedConceptId}
-              selectedConceptId={selectedConceptId}
+              onSelectNode={setSelectedNodeId}
+              selectedNodeId={selectedNodeId}
             />
           </div>
-          {selectedConcept && (
+          {selectedNode && (
             <ConceptDetail
-              concept={selectedConcept}
-              submissions={selectedSubmissions}
+              concept={{
+                id: selectedNode.id,
+                label: selectedNode.title,
+                level: "specific",
+                submissionCount: 1,
+                researcherIds: [selectedNode.submitterId],
+                researcherColors: [selectedNode.submitterColor],
+                isShared: false,
+              }}
+              submissions={[{
+                id: selectedNode.id,
+                title: selectedNode.title,
+                body: selectedNode.body,
+                contentType: selectedNode.contentType,
+                submitterId: selectedNode.submitterId,
+                submitterName: selectedNode.submitterName,
+                submitterColor: selectedNode.submitterColor,
+                concepts: selectedNode.concepts,
+                createdAt: selectedNode.createdAt,
+              }]}
               researchers={data!.researchers}
-              onClose={() => setSelectedConceptId(null)}
-              onNavigate={setSelectedConceptId}
-              allNodes={data!.nodes}
-              edges={data!.edges}
+              onClose={() => setSelectedNodeId(null)}
+              onNavigate={setSelectedNodeId}
+              allNodes={data!.nodes.map((n) => ({
+                id: n.id,
+                label: n.title,
+                level: "specific" as const,
+                submissionCount: 1,
+                researcherIds: [n.submitterId],
+                researcherColors: [n.submitterColor],
+                isShared: false,
+              }))}
+              edges={[]}
             />
           )}
         </div>

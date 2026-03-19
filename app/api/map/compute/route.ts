@@ -1,19 +1,21 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { extractConcepts } from "@/lib/concepts";
+import { generateEmbeddings, generateClusterLabel } from "@/lib/embeddings";
+// @ts-expect-error — umap-js has no type declarations
+import { UMAP } from "umap-js";
+// @ts-expect-error — dbscan has no type declarations
+import { DBSCAN as DBSCANLib } from "dbscan";
 
 export const maxDuration = 60;
-
-const BATCH_SIZE = 2;
 
 export async function POST() {
   try {
     const supabase = getSupabaseAdmin();
 
-    // 1. Fetch all submissions
+    // 1. Fetch all submissions with profiles
     const { data: submissions, error: fetchError } = await supabase
       .from("submissions")
-      .select("id, title, body, content_type, profile_id")
+      .select("id, title, body, content_type, profile_id, embedding")
       .order("created_at", { ascending: true });
 
     if (fetchError) throw fetchError;
@@ -24,142 +26,143 @@ export async function POST() {
       );
     }
 
-    // 2. Find which submissions already have concepts extracted
-    const { data: existingLinks } = await supabase
-      .from("submission_concepts")
-      .select("submission_id");
-    const processedIds = new Set(
-      (existingLinks || []).map((l: { submission_id: string }) => l.submission_id)
-    );
+    // 2. Embed any submissions that don't have embeddings yet
+    const needsEmbedding = submissions.filter((s) => !s.embedding);
+    if (needsEmbedding.length > 0) {
+      const texts = needsEmbedding.map(
+        (s) => `${s.title || ""}\n\n${(s.body || "").slice(0, 2000)}`.trim()
+      );
+      const embeddings = await generateEmbeddings(texts);
 
-    const needsExtraction = submissions.filter((s) => !processedIds.has(s.id));
+      for (let i = 0; i < needsEmbedding.length; i++) {
+        const sub = needsEmbedding[i];
+        const emb = embeddings[i];
+        if (emb) {
+          await supabase
+            .from("submissions")
+            .update({ embedding: JSON.stringify(emb) })
+            .eq("id", sub.id);
+          sub.embedding = emb as unknown as string;
+        }
+      }
+    }
 
-    if (needsExtraction.length === 0) {
+    // 3. Filter to only submissions with valid embeddings
+    const withEmbeddings = submissions.filter((s) => s.embedding);
+    if (withEmbeddings.length < 2) {
       return NextResponse.json({
         success: true,
+        message: "Need at least 2 submissions with embeddings",
         submissionCount: submissions.length,
-        processed: 0,
-        remaining: 0,
-        newConcepts: 0,
-        newEdges: 0,
+        embeddedCount: withEmbeddings.length,
       });
     }
 
-    // 3. Only process a batch to stay within timeout
-    const batch = needsExtraction.slice(0, BATCH_SIZE);
-    let newConcepts = 0;
-    let newEdges = 0;
+    // Parse embeddings — they might be stored as JSON strings or arrays
+    const embeddingVectors: number[][] = withEmbeddings.map((s) => {
+      if (typeof s.embedding === "string") {
+        return JSON.parse(s.embedding);
+      }
+      return s.embedding as unknown as number[];
+    });
 
-    // Pre-fetch all existing concepts to minimize DB round-trips
-    const { data: allConcepts } = await supabase
-      .from("concepts")
-      .select("id, label, level");
-    const conceptCache = new Map<string, { id: string; level: string }>();
-    for (const c of allConcepts || []) {
-      conceptCache.set(c.label, { id: c.id, level: c.level || "specific" });
+    // 4. Run UMAP projection (1024-dim → 2D)
+    const nNeighbors = Math.min(15, Math.max(2, withEmbeddings.length - 1));
+    const umap = new UMAP({
+      nNeighbors,
+      minDist: 0.1,
+      nComponents: 2,
+      spread: 1.0,
+    });
+
+    const projected: number[][] = umap.fit(embeddingVectors);
+
+    // 5. Normalize to [0, 1000] coordinate space
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const [x, y] of projected) {
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+    const rangeX = maxX - minX || 1;
+    const rangeY = maxY - minY || 1;
+    const padding = 50;
+    const scale = 1000 - 2 * padding;
+
+    const normalized = projected.map(([x, y]) => [
+      padding + ((x - minX) / rangeX) * scale,
+      padding + ((y - minY) / rangeY) * scale,
+    ]);
+
+    // 6. Run DBSCAN clustering on 2D coordinates
+    const epsilon = 80;
+    const minPoints = 2;
+    const dbscan = new DBSCANLib();
+    const clusterAssignments: number[] = dbscan.run(normalized, epsilon, minPoints)
+      .reduce((acc: number[], cluster: number[], clusterIdx: number) => {
+        for (const pointIdx of cluster) {
+          acc[pointIdx] = clusterIdx;
+        }
+        return acc;
+      }, new Array(normalized.length).fill(-1));
+
+    // 7. Clear old projections and write new ones
+    await supabase.from("projection_cache").delete().neq("submission_id", "00000000-0000-0000-0000-000000000000");
+
+    const projections = withEmbeddings.map((s, i) => ({
+      submission_id: s.id,
+      x: Math.round(normalized[i][0]),
+      y: Math.round(normalized[i][1]),
+      cluster_id: clusterAssignments[i] >= 0 ? clusterAssignments[i] : null,
+      computed_at: new Date().toISOString(),
+    }));
+
+    // Insert in batches to avoid payload limits
+    for (let i = 0; i < projections.length; i += 50) {
+      const batch = projections.slice(i, i + 50);
+      const { error: insertErr } = await supabase
+        .from("projection_cache")
+        .upsert(batch, { onConflict: "submission_id" });
+      if (insertErr) throw insertErr;
     }
 
-    for (const sub of batch) {
-      const existingLabels = Array.from(conceptCache.keys());
-      const result = await extractConcepts(sub.title || "", sub.body || "", existingLabels);
-      if (result.concepts.length === 0) continue;
+    // 8. Generate cluster labels
+    const clusterIds = [...new Set(clusterAssignments.filter((c) => c >= 0))];
+    await supabase.from("cluster_labels").delete().neq("cluster_id", -999);
 
-      // Upsert each concept (use cache first)
-      const conceptIds = new Map<string, string>();
-      for (const concept of result.concepts) {
-        const cached = conceptCache.get(concept.label);
-        if (cached) {
-          conceptIds.set(concept.label, cached.id);
-          // Upgrade to broad if newly classified as broad
-          if (concept.level === "broad" && cached.level !== "broad") {
-            await supabase
-              .from("concepts")
-              .update({ level: "broad" })
-              .eq("id", cached.id);
-            cached.level = "broad";
-          }
-        } else {
-          const { data: inserted, error: insertErr } = await supabase
-            .from("concepts")
-            .insert({ label: concept.label, level: concept.level })
-            .select("id")
-            .single();
-          if (insertErr) {
-            // Race condition — fetch it
-            const { data: retry } = await supabase
-              .from("concepts")
-              .select("id")
-              .eq("label", concept.label)
-              .single();
-            if (retry) {
-              conceptIds.set(concept.label, retry.id);
-              conceptCache.set(concept.label, { id: retry.id, level: concept.level });
-            }
-            continue;
-          }
-          if (inserted) {
-            conceptIds.set(concept.label, inserted.id);
-            conceptCache.set(concept.label, { id: inserted.id, level: concept.level });
-            newConcepts++;
-          }
-        }
-      }
+    for (const clusterId of clusterIds) {
+      const memberIndices = clusterAssignments
+        .map((c, i) => (c === clusterId ? i : -1))
+        .filter((i) => i >= 0);
 
-      // Link submission to concepts
-      const links = Array.from(conceptIds.values()).map((conceptId) => ({
-        submission_id: sub.id,
-        concept_id: conceptId,
-      }));
-      if (links.length > 0) {
-        await supabase
-          .from("submission_concepts")
-          .upsert(links, { onConflict: "submission_id,concept_id" });
-      }
+      const memberTexts = memberIndices.map((i) => {
+        const s = withEmbeddings[i];
+        return `${s.title || ""}: ${(s.body || "").slice(0, 300)}`;
+      });
 
-      // Create edges ONLY for LLM-specified relationships (not all-pairs)
-      for (const rel of result.relationships) {
-        const sourceId = conceptIds.get(rel.from);
-        const targetId = conceptIds.get(rel.to);
-        if (!sourceId || !targetId || sourceId === targetId) continue;
+      const label = await generateClusterLabel(memberTexts.slice(0, 5));
 
-        const { data: existingEdge } = await supabase
-          .from("concept_edges")
-          .select("id, weight")
-          .or(
-            `and(source_id.eq.${sourceId},target_id.eq.${targetId}),and(source_id.eq.${targetId},target_id.eq.${sourceId})`
-          )
-          .single();
+      const representativeIds = memberIndices
+        .slice(0, 3)
+        .map((i) => withEmbeddings[i].id);
 
-        if (existingEdge) {
-          await supabase
-            .from("concept_edges")
-            .update({
-              weight: (existingEdge.weight || 1) + 1,
-              relation: rel.relation,
-            })
-            .eq("id", existingEdge.id);
-        } else {
-          const { error: edgeErr } = await supabase
-            .from("concept_edges")
-            .insert({
-              source_id: sourceId,
-              target_id: targetId,
-              relation: rel.relation,
-              weight: 1,
-            });
-          if (!edgeErr) newEdges++;
-        }
-      }
+      await supabase.from("cluster_labels").upsert(
+        {
+          cluster_id: clusterId,
+          label,
+          representative_submission_ids: representativeIds,
+        },
+        { onConflict: "cluster_id" }
+      );
     }
 
-    const remaining = needsExtraction.length - batch.length;
     return NextResponse.json({
       success: true,
       submissionCount: submissions.length,
-      processed: batch.length,
-      remaining,
-      newConcepts,
-      newEdges,
+      embeddedCount: withEmbeddings.length,
+      projectedCount: projections.length,
+      clusterCount: clusterIds.length,
     });
   } catch (error) {
     console.error("Map compute error:", error);

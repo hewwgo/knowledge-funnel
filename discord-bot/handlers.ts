@@ -15,6 +15,7 @@ import {
   getSupabase,
   chatWithFunnel,
   extractAndLinkConcepts,
+  embedSubmission,
 } from "./shared.js";
 
 const EMBED_COLOR = 0x2A2535;
@@ -92,9 +93,11 @@ export async function handleSubmitLink(
       sourceUrl: url,
     });
 
-    // Fire-and-forget concept extraction for knowledge graph
+    // Fire-and-forget: concept extraction + embedding for knowledge graph
     extractAndLinkConcepts(submission.id, metadata.title || url, parts.join("\n\n"))
       .catch((err) => console.error("Link concept extraction failed:", err));
+    embedSubmission(submission.id, metadata.title || url, parts.join("\n\n"))
+      .catch((err) => console.error("Link embedding failed:", err));
 
     const embed = new EmbedBuilder()
       .setColor(EMBED_COLOR)
@@ -194,9 +197,11 @@ export async function handleSubmitNote(
       body: text,
     });
 
-    // Fire-and-forget concept extraction for knowledge graph
+    // Fire-and-forget: concept extraction + embedding for knowledge graph
     extractAndLinkConcepts(submission.id, firstLine, text)
       .catch((err) => console.error("Note concept extraction failed:", err));
+    embedSubmission(submission.id, firstLine, text)
+      .catch((err) => console.error("Note embedding failed:", err));
 
     const embed = new EmbedBuilder()
       .setColor(EMBED_COLOR)
@@ -451,9 +456,11 @@ export async function handlePdfAttachment(
       filePath: fileName,
     });
 
-    // Fire-and-forget concept extraction for knowledge graph
+    // Fire-and-forget: concept extraction + embedding for knowledge graph
     extractAndLinkConcepts(submission.id, title, parts.join("\n\n"))
       .catch((err) => console.error("PDF concept extraction failed:", err));
+    embedSubmission(submission.id, title, parts.join("\n\n"))
+      .catch((err) => console.error("PDF embedding failed:", err));
 
     const embed = new EmbedBuilder()
       .setColor(EMBED_COLOR)

@@ -2,53 +2,33 @@
 
 import { useEffect, useRef, useCallback } from "react";
 import * as d3 from "d3";
-import type { GraphData } from "../page";
+import type { MapData, MapNode, Cluster } from "../page";
 
 interface Props {
-  data: GraphData;
+  data: MapData;
   hiddenResearchers: Set<string>;
   searchQuery: string;
-  onSelectConcept: (id: string) => void;
-  selectedConceptId: string | null;
-}
-
-interface SimNode extends d3.SimulationNodeDatum {
-  id: string;
-  label: string;
-  level: "broad" | "specific";
-  submissionCount: number;
-  researcherIds: string[];
-  researcherColors: string[];
-  isShared: boolean;
-}
-
-interface SimEdge extends d3.SimulationLinkDatum<SimNode> {
-  relation: string;
-  weight: number;
+  onSelectNode: (id: string) => void;
+  selectedNodeId: string | null;
 }
 
 export default function KnowledgeGraph({
   data,
   hiddenResearchers,
   searchQuery,
-  onSelectConcept,
-  selectedConceptId,
+  onSelectNode,
+  selectedNodeId,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
-  const simulationRef = useRef<d3.Simulation<SimNode, SimEdge> | null>(null);
-  const currentZoomK = useRef(1);
 
   const isNodeActive = useCallback(
-    (node: SimNode) => {
-      if (
-        node.researcherIds.length > 0 &&
-        node.researcherIds.every((rid) => hiddenResearchers.has(rid))
-      )
-        return false;
+    (node: MapNode) => {
+      if (hiddenResearchers.has(node.submitterId)) return false;
       if (
         searchQuery &&
-        !node.label.toLowerCase().includes(searchQuery.toLowerCase())
+        !node.title.toLowerCase().includes(searchQuery.toLowerCase()) &&
+        !node.concepts.some((c) => c.toLowerCase().includes(searchQuery.toLowerCase()))
       )
         return false;
       return true;
@@ -66,189 +46,114 @@ export default function KnowledgeGraph({
 
     svg.selectAll("*").remove();
 
-    // Prepare data for D3 simulation
-    const nodes: SimNode[] = data.nodes.map((n) => ({
-      ...n,
-      level: n.level || "specific",
-    }));
-    const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+    const nodes = data.nodes;
+    const clusters = data.clusters;
 
-    const edges: SimEdge[] = data.edges
-      .filter((e) => nodeMap.has(e.source) && nodeMap.has(e.target))
-      .map((e) => ({
-        source: e.source,
-        target: e.target,
-        relation: e.relation,
-        weight: e.weight,
-      }));
+    // Scale UMAP coords [0,1000] to fit the viewport
+    const xScale = d3.scaleLinear().domain([0, 1000]).range([80, width - 80]);
+    const yScale = d3.scaleLinear().domain([0, 1000]).range([80, height - 80]);
 
-    // Size scale: hierarchy-aware
-    const maxSubs = Math.max(...nodes.map((n) => n.submissionCount), 1);
-    const radiusScale = d3
-      .scaleSqrt()
-      .domain([1, maxSubs])
-      .range([8, 28]);
-
-    const getRadius = (d: SimNode) => {
-      const base = radiusScale(d.submissionCount);
-      // Broad concepts get a minimum size boost
-      return d.level === "broad" ? Math.max(base, 22) + 6 : base;
-    };
-
-    // Main group for zoom
     const g = svg.append("g");
 
-    // Zoom behavior with semantic zoom
+    // Zoom/pan
     const zoom = d3
       .zoom<SVGSVGElement, unknown>()
-      .scaleExtent([0.2, 5])
+      .scaleExtent([0.3, 6])
       .on("zoom", (event) => {
         g.attr("transform", event.transform);
         const k = event.transform.k;
-        currentZoomK.current = k;
         applySemanticZoom(k);
       });
     svg.call(zoom);
 
-    // Force simulation — hierarchy-aware
-    const simulation = d3
-      .forceSimulation<SimNode>(nodes)
-      .force(
-        "link",
-        d3
-          .forceLink<SimNode, SimEdge>(edges)
-          .id((d) => d.id)
-          .distance((d) => {
-            const s = d.source as SimNode;
-            const t = d.target as SimNode;
-            // "part of" edges are shorter to cluster specific around broad
-            if (d.relation === "part of") return 60;
-            // Edges between two broad concepts are longer
-            if (s.level === "broad" && t.level === "broad") return 200;
-            return 120 / Math.sqrt(d.weight);
-          })
-          .strength((d) => {
-            if (d.relation === "part of") return 0.6;
-            return Math.min(0.5, d.weight * 0.1);
-          })
-      )
-      .force(
-        "charge",
-        d3.forceManyBody<SimNode>().strength((d) =>
-          d.level === "broad" ? -500 : -200
-        )
-      )
-      .force("center", d3.forceCenter(width / 2, height / 2))
-      .force(
-        "collision",
-        d3.forceCollide<SimNode>().radius((d) => getRadius(d) + 6)
+    // --- Layer 1: Cluster hulls ---
+    const hullGroup = g.append("g").attr("class", "hulls");
+
+    for (const cluster of clusters) {
+      if (cluster.points.length < 3) continue;
+
+      const scaledPoints: [number, number][] = cluster.points.map(
+        ([x, y]) => [xScale(x), yScale(y)]
       );
 
-    // Let simulation settle then stop — prevents bouncing on re-render
-    simulation.alphaDecay(0.05);
-    simulationRef.current = simulation;
+      const hull = d3.polygonHull(scaledPoints);
+      if (!hull) continue;
 
-    // Draw edges
-    const link = g
-      .append("g")
-      .attr("class", "edges")
-      .selectAll("line")
-      .data(edges)
-      .join("line")
-      .attr("class", "graph-edge")
-      .attr("stroke", "rgba(38, 38, 36, 0.15)")
-      .attr("stroke-width", (d) => Math.min(4, d.weight * 1.5));
+      // Expand hull slightly for padding
+      const cx = cluster.centroidX;
+      const cy = cluster.centroidY;
+      const expandedHull = hull.map(([x, y]) => {
+        const dx = x - xScale(cx);
+        const dy = y - yScale(cy);
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const expand = 25;
+        return [
+          x + (dx / (dist || 1)) * expand,
+          y + (dy / (dist || 1)) * expand,
+        ] as [number, number];
+      });
 
-    // Draw edge labels
-    const edgeLabel = g
-      .append("g")
-      .attr("class", "edge-labels")
-      .selectAll("text")
-      .data(edges)
-      .join("text")
-      .attr("class", "graph-edge-label")
-      .attr("text-anchor", "middle")
-      .attr("fill", "rgba(38, 38, 36, 0.4)")
-      .attr("font-size", "9px")
-      .attr("opacity", 0)
-      .text((d) => d.relation);
+      hullGroup
+        .append("path")
+        .attr("d", `M${expandedHull.map((p) => p.join(",")).join("L")}Z`)
+        .attr("fill", "rgba(38, 38, 36, 0.04)")
+        .attr("stroke", "rgba(38, 38, 36, 0.15)")
+        .attr("stroke-width", 1)
+        .attr("stroke-dasharray", "6,3")
+        .attr("class", "cluster-hull");
 
-    // Draw nodes
-    const node = g
-      .append("g")
-      .attr("class", "nodes")
-      .selectAll<SVGGElement, SimNode>("g")
+      // Cluster label
+      hullGroup
+        .append("text")
+        .attr("x", xScale(cluster.centroidX))
+        .attr("y", yScale(cluster.centroidY) - Math.max(...scaledPoints.map(p => Math.abs(p[1] - yScale(cy)))) - 15)
+        .attr("text-anchor", "middle")
+        .attr("fill", "rgba(38, 38, 36, 0.4)")
+        .attr("font-size", "11px")
+        .attr("font-weight", "600")
+        .attr("font-style", "italic")
+        .attr("class", "cluster-label")
+        .text(cluster.label);
+    }
+
+    // --- Layer 2: Nodes (submissions) ---
+    const nodeGroup = g.append("g").attr("class", "nodes");
+    const NODE_RADIUS = 8;
+
+    const node = nodeGroup
+      .selectAll<SVGGElement, MapNode>("g")
       .data(nodes)
       .join("g")
       .attr("class", "graph-node-group")
+      .attr("transform", (d) => `translate(${xScale(d.x)},${yScale(d.y)})`)
       .attr("cursor", "pointer");
 
     // Node circles
-    node.each(function (d) {
-      const el = d3.select(this);
-      const r = getRadius(d);
+    node
+      .append("circle")
+      .attr("r", NODE_RADIUS)
+      .attr("fill", (d) => d.submitterColor)
+      .attr("class", "graph-node")
+      .attr("stroke", "white")
+      .attr("stroke-width", 1.5)
+      .style("transition", "opacity 0.2s");
 
-      if (d.researcherColors.length <= 1) {
-        el.append("circle")
-          .attr("r", r)
-          .attr("fill", d.researcherColors[0] || "#999999")
-          .attr("class", "graph-node")
-          .style("transition", "opacity 0.2s");
-      } else {
-        const colors = d.researcherColors;
-        const anglePerSlice = (2 * Math.PI) / colors.length;
-        const arc = d3.arc<unknown>().innerRadius(0).outerRadius(r);
-
-        colors.forEach((color, i) => {
-          el.append("path")
-            .attr(
-              "d",
-              arc({
-                startAngle: i * anglePerSlice,
-                endAngle: (i + 1) * anglePerSlice,
-              } as d3.DefaultArcObject)
-            )
-            .attr("fill", color)
-            .attr("class", "graph-node")
-            .style("transition", "opacity 0.2s");
-        });
-      }
-
-      // Shared concept ring
-      if (d.isShared) {
-        el.append("circle")
-          .attr("r", r + 3)
-          .attr("fill", "none")
-          .attr("stroke", "#262624")
-          .attr("stroke-width", 2)
-          .attr("stroke-dasharray", "4,2")
-          .attr("class", "graph-shared-ring");
-      }
-
-      // Broad concept double ring indicator
-      if (d.level === "broad") {
-        el.append("circle")
-          .attr("r", r + (d.isShared ? 7 : 4))
-          .attr("fill", "none")
-          .attr("stroke", "rgba(38, 38, 36, 0.3)")
-          .attr("stroke-width", 1.5)
-          .attr("class", "graph-broad-ring");
-      }
-    });
-
-    // Node labels
+    // Node labels (title, truncated)
     node
       .append("text")
       .attr("class", "graph-node-label")
       .attr("text-anchor", "middle")
-      .attr("dy", (d) => getRadius(d) + 14)
+      .attr("dy", NODE_RADIUS + 13)
       .attr("fill", "#262624")
-      .attr("font-size", (d) => (d.level === "broad" ? "12px" : "10px"))
-      .attr("font-weight", (d) => (d.level === "broad" ? "700" : "500"))
-      .style("transition", "opacity 0.2s")
-      .text((d) => d.label);
+      .attr("font-size", "9px")
+      .attr("font-weight", "500")
+      .attr("opacity", 0)
+      .text((d) => {
+        const t = d.title || "";
+        return t.length > 30 ? t.slice(0, 28) + "…" : t;
+      });
 
-    // Semantic zoom function
+    // Semantic zoom
     function applySemanticZoom(k: number) {
       node.each(function (d) {
         const el = d3.select(this);
@@ -259,75 +164,37 @@ export default function KnowledgeGraph({
           return;
         }
 
-        if (k < 0.6) {
-          // Very zoomed out: only broad concepts
-          el.attr("opacity", d.level === "broad" ? 1 : 0.06);
-          el.select(".graph-node-label")
-            .attr("opacity", d.level === "broad" ? 1 : 0);
-        } else if (k < 1.2) {
-          // Medium zoom: all nodes, labels for broad + popular specific
-          el.attr("opacity", 1);
-          el.select(".graph-node-label").attr(
-            "opacity",
-            d.level === "broad" || d.submissionCount > 1 ? 1 : 0.3
-          );
-        } else {
-          // Zoomed in: everything visible
-          el.attr("opacity", 1);
-          el.select(".graph-node-label").attr("opacity", 1);
-        }
+        el.attr("opacity", 1);
+
+        // Show labels only when zoomed in
+        el.select(".graph-node-label")
+          .attr("opacity", k > 1.5 ? 1 : 0);
       });
 
-      // Edge labels only when zoomed in
-      edgeLabel.attr("opacity", k > 2 ? 0.6 : 0);
-
-      // Edges: filter by zoom level
-      link.each(function (d) {
-        const s = d.source as SimNode;
-        const t = d.target as SimNode;
-        const sActive = isNodeActive(s);
-        const tActive = isNodeActive(t);
-
-        if (!sActive || !tActive) {
-          d3.select(this).attr("opacity", 0.02);
-          return;
-        }
-
-        if (k < 0.6) {
-          // Only show edges involving broad concepts
-          const hasBroad = s.level === "broad" || t.level === "broad";
-          d3.select(this).attr("opacity", hasBroad ? 0.3 : 0.02);
-        } else {
-          d3.select(this).attr("opacity", 0.4);
-        }
-      });
+      // Cluster labels visible when zoomed out, hidden when zoomed in
+      hullGroup.selectAll(".cluster-label")
+        .attr("opacity", k < 2 ? 1 : 0.3);
     }
 
-    // Interactions
+    // Tooltip
     node
       .on("mouseenter", (event, d) => {
         if (!isNodeActive(d)) return;
-        const researchers = d.researcherIds
-          .map((rid) => data.researchers.find((r) => r.id === rid)?.name || "")
-          .filter(Boolean);
 
-        const levelBadge = d.level === "broad"
-          ? `<span style="color:#0072B2;font-size:10px;font-weight:600">RESEARCH FIELD</span><br/>`
-          : "";
+        const contentIcon =
+          d.contentType === "paper" ? "📄" :
+          d.contentType === "link" ? "🔗" :
+          d.contentType === "idea" ? "💡" : "📝";
 
         tooltip
           .style("display", "block")
           .style("left", `${event.pageX + 12}px`)
           .style("top", `${event.pageY - 12}px`)
           .html(
-            `<strong>${d.label}</strong><br/>` +
-              levelBadge +
-              `<span style="color:rgba(255,255,255,0.7)">${d.submissionCount} submission${d.submissionCount !== 1 ? "s" : ""}</span><br/>` +
-              (researchers.length > 0
-                ? `<span style="color:rgba(255,255,255,0.5);font-size:11px">${researchers.join(", ")}</span>`
-                : "") +
-              (d.isShared
-                ? `<br/><span style="color:#E69F00;font-size:10px;font-weight:600">SHARED INTEREST</span>`
+            `<strong>${contentIcon} ${d.title}</strong><br/>` +
+              `<span style="color:rgba(255,255,255,0.6);font-size:11px">by ${d.submitterName}</span><br/>` +
+              (d.concepts.length > 0
+                ? `<span style="color:rgba(255,255,255,0.5);font-size:10px">${d.concepts.join(", ")}</span>`
                 : "")
           );
       })
@@ -340,60 +207,25 @@ export default function KnowledgeGraph({
         tooltip.style("display", "none");
       })
       .on("click", (_event, d) => {
-        if (isNodeActive(d)) onSelectConcept(d.id);
+        if (isNodeActive(d)) onSelectNode(d.id);
       });
 
-    // Drag behavior
-    const drag = d3
-      .drag<SVGGElement, SimNode>()
-      .on("start", (event, d) => {
-        if (!event.active) simulation.alphaTarget(0.3).restart();
-        d.fx = d.x;
-        d.fy = d.y;
-      })
-      .on("drag", (event, d) => {
-        d.fx = event.x;
-        d.fy = event.y;
-      })
-      .on("end", (event, d) => {
-        if (!event.active) simulation.alphaTarget(0);
-        d.fx = null;
-        d.fy = null;
-      });
-    node.call(drag);
-
-    // Tick: update positions
-    simulation.on("tick", () => {
-      link
-        .attr("x1", (d) => (d.source as SimNode).x!)
-        .attr("y1", (d) => (d.source as SimNode).y!)
-        .attr("x2", (d) => (d.target as SimNode).x!)
-        .attr("y2", (d) => (d.target as SimNode).y!);
-
-      edgeLabel
-        .attr("x", (d) => ((d.source as SimNode).x! + (d.target as SimNode).x!) / 2)
-        .attr("y", (d) => ((d.source as SimNode).y! + (d.target as SimNode).y!) / 2);
-
-      node.attr("transform", (d) => `translate(${d.x},${d.y})`);
-    });
-
-    // Initial filter + zoom state
+    // Initial state
     applySemanticZoom(1);
 
     return () => {
-      simulation.stop();
       svg.selectAll("*").remove();
     };
-  }, [data, hiddenResearchers, searchQuery, isNodeActive, onSelectConcept]);
+  }, [data, hiddenResearchers, searchQuery, isNodeActive, onSelectNode]);
 
-  // Separate effect for selection highlight — doesn't rebuild the graph
+  // Selection highlight (separate effect to avoid full re-render)
   useEffect(() => {
     if (!svgRef.current) return;
     const svg = d3.select(svgRef.current);
-    svg.selectAll<SVGElement, SimNode>(".graph-node")
-      .attr("stroke", (d) => d.id === selectedConceptId ? "#262624" : "none")
-      .attr("stroke-width", (d) => d.id === selectedConceptId ? 3 : 0);
-  }, [selectedConceptId]);
+    svg.selectAll<SVGCircleElement, MapNode>(".graph-node")
+      .attr("stroke", (d) => d.id === selectedNodeId ? "#262624" : "white")
+      .attr("stroke-width", (d) => d.id === selectedNodeId ? 3 : 1.5);
+  }, [selectedNodeId]);
 
   return (
     <div className="map-canvas">

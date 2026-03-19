@@ -12,59 +12,59 @@ export async function GET() {
   try {
     const supabase = getSupabaseAdmin();
 
-    // 1. Fetch all concepts
-    const { data: concepts, error: cErr } = await supabase
-      .from("concepts")
-      .select("id, label, level");
-    if (cErr) throw cErr;
-    if (!concepts || concepts.length === 0) {
-      return NextResponse.json({
-        nodes: [],
-        edges: [],
-        submissions: [],
-        researchers: [],
-      });
-    }
-
-    // 2. Fetch all submission-concept links with submission + profile
-    const { data: links, error: lErr } = await supabase
-      .from("submission_concepts")
+    // 1. Fetch projections with submission + profile data
+    const { data: projections, error: projError } = await supabase
+      .from("projection_cache")
       .select(`
-        concept_id,
+        submission_id, x, y, cluster_id, computed_at,
         submissions!inner (
           id, title, body, content_type, profile_id, created_at,
           profiles!inner ( id, name )
         )
-      `);
-    if (lErr) throw lErr;
+      `)
+      .order("computed_at", { ascending: false });
 
-    // 3. Fetch all edges
-    const { data: edges, error: eErr } = await supabase
-      .from("concept_edges")
-      .select("source_id, target_id, relation, weight");
-    if (eErr) throw eErr;
+    if (projError) throw projError;
+    if (!projections || projections.length === 0) {
+      return NextResponse.json({
+        nodes: [],
+        clusters: [],
+        researchers: [],
+        computedAt: null,
+      });
+    }
 
-    // 4. Build researcher color map
+    // 2. Fetch concept labels for each submission (for tooltips)
+    const { data: conceptLinks } = await supabase
+      .from("submission_concepts")
+      .select("submission_id, concepts!inner(label)");
+
+    const conceptsBySubmission = new Map<string, string[]>();
+    for (const link of conceptLinks || []) {
+      const subId = link.submission_id;
+      const label = (link.concepts as unknown as { label: string })?.label;
+      if (!label) continue;
+      if (!conceptsBySubmission.has(subId)) {
+        conceptsBySubmission.set(subId, []);
+      }
+      conceptsBySubmission.get(subId)!.push(label);
+    }
+
+    // 3. Fetch cluster labels
+    const { data: clusterLabelsData } = await supabase
+      .from("cluster_labels")
+      .select("cluster_id, label");
+    const clusterLabelMap = new Map<number, string>();
+    for (const cl of clusterLabelsData || []) {
+      clusterLabelMap.set(cl.cluster_id, cl.label);
+    }
+
+    // 4. Build researcher color map + nodes
     const researcherMap = new Map<string, { id: string; name: string; color: string; submissionCount: number }>();
     let colorIndex = 0;
 
-    // 5. Build concept → submissions mapping
-    const conceptSubmissions = new Map<string, Set<string>>();
-    const conceptResearchers = new Map<string, Set<string>>();
-    const submissionMap = new Map<string, {
-      id: string;
-      title: string;
-      body: string;
-      contentType: string;
-      submitterId: string;
-      submitterName: string;
-      submitterColor: string;
-      concepts: string[];
-      createdAt: string;
-    }>();
-
-    for (const link of links || []) {
-      const sub = link.submissions as unknown as {
+    const nodes = projections.map((p: Record<string, unknown>) => {
+      const sub = p.submissions as unknown as {
         id: string;
         title: string;
         body: string;
@@ -74,9 +74,7 @@ export async function GET() {
         profiles: { id: string; name: string };
       };
       const profile = sub.profiles;
-      const conceptId = link.concept_id;
 
-      // Register researcher
       if (!researcherMap.has(profile.id)) {
         researcherMap.set(profile.id, {
           id: profile.id,
@@ -87,80 +85,47 @@ export async function GET() {
         colorIndex++;
       }
       const researcher = researcherMap.get(profile.id)!;
+      researcher.submissionCount++;
 
-      // Track concept → submissions
-      if (!conceptSubmissions.has(conceptId)) {
-        conceptSubmissions.set(conceptId, new Set());
-      }
-      conceptSubmissions.get(conceptId)!.add(sub.id);
+      return {
+        id: sub.id,
+        title: sub.title || "(untitled)",
+        body: (sub.body || "").slice(0, 300),
+        contentType: sub.content_type,
+        x: p.x as number,
+        y: p.y as number,
+        clusterId: p.cluster_id as number | null,
+        submitterId: profile.id,
+        submitterName: profile.name,
+        submitterColor: researcher.color,
+        concepts: conceptsBySubmission.get(sub.id) || [],
+        createdAt: sub.created_at,
+      };
+    });
 
-      // Track concept → researchers
-      if (!conceptResearchers.has(conceptId)) {
-        conceptResearchers.set(conceptId, new Set());
-      }
-      conceptResearchers.get(conceptId)!.add(profile.id);
-
-      // Build submission record
-      if (!submissionMap.has(sub.id)) {
-        researcher.submissionCount++;
-        submissionMap.set(sub.id, {
-          id: sub.id,
-          title: sub.title || "",
-          body: (sub.body || "").slice(0, 300),
-          contentType: sub.content_type,
-          submitterId: profile.id,
-          submitterName: profile.name,
-          submitterColor: researcher.color,
-          concepts: [],
-          createdAt: sub.created_at,
-        });
-      }
-
-      // Add concept label to submission
-      const concept = concepts.find((c) => c.id === conceptId);
-      if (concept) {
-        const existing = submissionMap.get(sub.id)!;
-        if (!existing.concepts.includes(concept.label)) {
-          existing.concepts.push(concept.label);
-        }
-      }
+    // 5. Build clusters array with centroids
+    const clusterGroups = new Map<number, typeof nodes>();
+    for (const n of nodes) {
+      if (n.clusterId === null || n.clusterId === undefined || n.clusterId === -1) continue;
+      if (!clusterGroups.has(n.clusterId)) clusterGroups.set(n.clusterId, []);
+      clusterGroups.get(n.clusterId)!.push(n);
     }
 
-    // 6. Build nodes array
-    const nodes = concepts
-      .filter((c) => conceptSubmissions.has(c.id))
-      .map((c) => {
-        const researcherIds = Array.from(conceptResearchers.get(c.id) || []);
-        const researcherColors = researcherIds
-          .map((rid) => researcherMap.get(rid)?.color || "#999999");
-
-        return {
-          id: c.id,
-          label: c.label,
-          level: (c as { level?: string }).level || "specific",
-          submissionCount: conceptSubmissions.get(c.id)?.size || 0,
-          researcherIds,
-          researcherColors,
-          isShared: researcherIds.length > 1,
-        };
-      });
-
-    // 7. Build edges array
-    const nodeIds = new Set(nodes.map((n) => n.id));
-    const graphEdges = (edges || [])
-      .filter((e) => nodeIds.has(e.source_id) && nodeIds.has(e.target_id))
-      .map((e) => ({
-        source: e.source_id,
-        target: e.target_id,
-        relation: e.relation || "co-occurs",
-        weight: e.weight || 1,
-      }));
+    const clusters = Array.from(clusterGroups.entries()).map(([id, members]) => ({
+      id,
+      label: clusterLabelMap.get(id) || "Unlabeled",
+      points: members.map((m) => [m.x, m.y] as [number, number]),
+      centroidX: members.reduce((sum, m) => sum + m.x, 0) / members.length,
+      centroidY: members.reduce((sum, m) => sum + m.y, 0) / members.length,
+      memberCount: members.length,
+      submitterIds: [...new Set(members.map((m) => m.submitterId))],
+    }));
 
     return NextResponse.json({
       nodes,
-      edges: graphEdges,
-      submissions: Array.from(submissionMap.values()),
+      clusters,
       researchers: Array.from(researcherMap.values()),
+      computedAt: projections[0]?.computed_at || null,
     });
   } catch (error) {
     console.error("Map data error:", error);
