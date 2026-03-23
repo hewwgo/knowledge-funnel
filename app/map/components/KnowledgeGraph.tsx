@@ -12,6 +12,8 @@ interface Props {
   selectedNodeId: string | null;
   onSelectCluster: (id: number) => void;
   selectedClusterId: number | null;
+  multiSelectIds: Set<string>;
+  onToggleMultiSelect: (id: string) => void;
 }
 
 export default function KnowledgeGraph({
@@ -22,6 +24,8 @@ export default function KnowledgeGraph({
   selectedNodeId,
   onSelectCluster,
   selectedClusterId,
+  multiSelectIds,
+  onToggleMultiSelect,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
@@ -220,8 +224,13 @@ export default function KnowledgeGraph({
       .on("mouseleave", () => {
         tooltip.style("display", "none");
       })
-      .on("click", (_event, d) => {
-        if (isNodeActive(d)) onSelectNode(d.id);
+      .on("click", (event, d) => {
+        if (!isNodeActive(d)) return;
+        if (event.shiftKey) {
+          onToggleMultiSelect(d.id);
+        } else {
+          onSelectNode(d.id);
+        }
       });
 
     // Initial state
@@ -237,9 +246,17 @@ export default function KnowledgeGraph({
     if (!svgRef.current) return;
     const svg = d3.select(svgRef.current);
     svg.selectAll<SVGCircleElement, MapNode>(".graph-node")
-      .attr("stroke", (d) => d.id === selectedNodeId ? "#262624" : "white")
-      .attr("stroke-width", (d) => d.id === selectedNodeId ? 3 : 1.5);
-  }, [selectedNodeId]);
+      .attr("stroke", (d) =>
+        d.id === selectedNodeId ? "#262624"
+        : multiSelectIds.has(d.id) ? "#D55E00"
+        : "white"
+      )
+      .attr("stroke-width", (d) =>
+        d.id === selectedNodeId ? 3
+        : multiSelectIds.has(d.id) ? 2.5
+        : 1.5
+      );
+  }, [selectedNodeId, multiSelectIds]);
 
   return (
     <div className="map-canvas">

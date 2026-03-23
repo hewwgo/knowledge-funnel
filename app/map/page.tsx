@@ -55,6 +55,7 @@ export default function MapPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [computing, setComputing] = useState(false);
   const [computeProgress, setComputeProgress] = useState("");
+  const [multiSelectIds, setMultiSelectIds] = useState<Set<string>>(new Set());
 
   const fetchData = useCallback(async () => {
     try {
@@ -153,6 +154,20 @@ export default function MapPage() {
     setSelectedNodeId(null);
   };
 
+  const handleToggleMultiSelect = (id: string) => {
+    setMultiSelectIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleExploreSelected = () => {
+    const ids = Array.from(multiSelectIds).join(",");
+    window.location.href = `/explore?seeds=${ids}`;
+  };
+
   // Get selected items for detail panels
   const selectedNode = data?.nodes.find((n) => n.id === selectedNodeId) || null;
   const selectedCluster = data?.clusters.find((c) => c.id === selectedClusterId) || null;
@@ -217,6 +232,8 @@ export default function MapPage() {
               selectedNodeId={selectedNodeId}
               onSelectCluster={handleSelectCluster}
               selectedClusterId={selectedClusterId}
+              multiSelectIds={multiSelectIds}
+              onToggleMultiSelect={handleToggleMultiSelect}
             />
           </div>
           {selectedNode && (
@@ -234,6 +251,17 @@ export default function MapPage() {
               onClose={() => setSelectedClusterId(null)}
               onSelectNode={handleSelectNode}
             />
+          )}
+          {multiSelectIds.size > 0 && (
+            <div className="map-selection-bar">
+              <span>{multiSelectIds.size} selected</span>
+              <button className="map-selection-explore" onClick={handleExploreSelected}>
+                Explore Ideas
+              </button>
+              <button onClick={() => setMultiSelectIds(new Set())}>
+                Clear
+              </button>
+            </div>
           )}
         </div>
       )}
