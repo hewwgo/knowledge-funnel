@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation";
 interface Seed {
   type: string;
   label: string;
+  body?: string;
 }
 
 interface Idea {
@@ -56,11 +57,14 @@ async function callLLM(systemPrompt: string, userPrompt: string): Promise<string
 }
 
 function buildConstraintString(seeds: Seed[], lockedFacets: LockedFacet[]): string {
-  const parts = seeds.map((s) => `${s.type}: ${s.label}`);
+  const parts = seeds.map((s) => {
+    const bodySnippet = s.body ? ` — ${s.body.slice(0, 300)}` : "";
+    return `${s.type}: ${s.label}${bodySnippet}`;
+  });
   lockedFacets.forEach((f) => {
     parts.push(`${f.name}: ${f.selectedValues.join(", ")}`);
   });
-  return parts.join("; ");
+  return parts.join("\n\n");
 }
 
 async function generateIdeas(
@@ -74,9 +78,11 @@ Return a JSON array where each element is: {"title": "Evocative short title", "d
 Only JSON, nothing else.`;
   const raw = await callLLM(sys, prompt);
   try {
-    return JSON.parse(raw.replace(/```json|```/g, "").trim());
+    const jsonMatch = raw.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) throw new Error("No JSON array found");
+    return JSON.parse(jsonMatch[0]);
   } catch {
-    console.error("Parse error for ideas:", raw);
+    console.error("Parse error for ideas:", raw.slice(0, 500));
     return [];
   }
 }
@@ -95,9 +101,11 @@ Return a JSON array: [{"name": "Facet Name", "type": "categorical"|"ordinal", "v
 Only JSON.`;
   const raw = await callLLM(sys, prompt);
   try {
-    return JSON.parse(raw.replace(/```json|```/g, "").trim());
+    const jsonMatch = raw.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) throw new Error("No JSON array found");
+    return JSON.parse(jsonMatch[0]);
   } catch {
-    console.error("Parse error for facets:", raw);
+    console.error("Parse error for facets:", raw.slice(0, 500));
     return [];
   }
 }
@@ -105,17 +113,19 @@ Only JSON.`;
 async function classifyIdeas(
   ideas: { title: string; description: string }[], facets: Facet[]
 ): Promise<{ index: number; facets: Record<string, string[]> }[]> {
-  const sys = `You classify research ideas into facet values. Respond ONLY with a JSON array. No markdown, no backticks, no preamble.`;
+  const sys = `You classify research ideas into facet values. Respond ONLY with a valid JSON array. No markdown fences, no backticks, no explanation, no preamble. Start your response with [ and end with ].`;
   const facetDesc = facets.map((f) => `${f.name}: [${f.values.join(", ")}]`).join("\n");
   const titles = ideas.map((i, idx) => `${idx}: ${i.title}`).join("\n");
-  const prompt = `Facets:\n${facetDesc}\n\nIdeas:\n${titles}\n\nFor each idea (by index), assign one or more values per facet. An idea CAN belong to multiple values in a facet.
-Return a JSON array: [{"index": 0, "facets": {"Facet Name": ["Value1","Value2"], ...}}, ...]
-Only JSON.`;
+  const prompt = `Facets:\n${facetDesc}\n\nIdeas:\n${titles}\n\nFor each idea (by index), assign one or more values per facet.
+Return JSON array: [{"index": 0, "facets": {"Facet Name": ["Value1"], ...}}, ...]`;
   const raw = await callLLM(sys, prompt);
   try {
-    return JSON.parse(raw.replace(/```json|```/g, "").trim());
+    // Extract JSON array from response even if there's surrounding text
+    const jsonMatch = raw.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) throw new Error("No JSON array found");
+    return JSON.parse(jsonMatch[0]);
   } catch {
-    console.error("Parse error for classification:", raw);
+    console.error("Parse error for classification:", raw.slice(0, 500));
     return [];
   }
 }
@@ -310,9 +320,10 @@ function ExploreInner() {
       .then((res) => res.json())
       .then((data) => {
         if (data.seeds && data.seeds.length > 0) {
-          setSeeds(data.seeds.map((s: { title: string }) => ({
+          setSeeds(data.seeds.map((s: { title: string; body?: string }) => ({
             type: "Seed",
             label: s.title,
+            body: s.body || "",
           })));
         }
         setSeedsLoaded(true);
