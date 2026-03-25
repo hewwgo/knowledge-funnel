@@ -36,7 +36,7 @@ interface LockedFacet {
 
 // ── Constants ──────────────────────────────────────────────────────
 const DEFAULT_TARGET = 9;
-const BATCH_SIZE = 3;
+const BATCH_SIZE = 2;
 
 const COLORS = [
   "#E69F00", "#56B4E9", "#009E73", "#F0E442",
