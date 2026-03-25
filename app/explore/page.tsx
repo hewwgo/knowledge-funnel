@@ -310,7 +310,10 @@ function FacetColumn({ facet, ideas, selectedValues, onToggleValue, onLock, onDi
         </div>
       </div>
       <div style={{ padding: 6, display: "flex", flexDirection: "column", gap: 4, overflowY: "auto", flex: 1 }}>
-        {facet.values.map((v) => (
+        {facet.values.filter((v) => {
+          // Only show values that have at least 1 idea
+          return ideas.some((i) => i.facetValues?.[facet.name]?.includes(v));
+        }).map((v) => (
           <ValueBucket
             key={v}
             facetName={facet.name}
