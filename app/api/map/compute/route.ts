@@ -3,54 +3,70 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { generateEmbeddings, generateClusterLabel } from "@/lib/embeddings";
 import { UMAP } from "umap-js";
 
-// Simple DBSCAN implementation (the npm package has an incompatible API)
-function dbscan(points: number[][], epsilon: number, minPoints: number): number[] {
+// Simple k-means clustering — always produces k clusters, every point assigned
+function kmeans(points: number[][], k: number, maxIter = 50): number[] {
   const n = points.length;
-  const labels = new Array(n).fill(-1); // -1 = noise
-  let clusterId = 0;
+  if (n <= k) return points.map((_, i) => i); // each point is its own cluster
 
-  function dist(a: number[], b: number[]) {
-    const dx = a[0] - b[0], dy = a[1] - b[1];
-    return Math.sqrt(dx * dx + dy * dy);
-  }
+  // Initialize centroids using k-means++ for better spread
+  const centroids: number[][] = [];
+  centroids.push([...points[Math.floor(Math.random() * n)]]);
 
-  function regionQuery(idx: number): number[] {
-    const neighbors: number[] = [];
+  for (let c = 1; c < k; c++) {
+    const dists = points.map((p) => {
+      const minDist = Math.min(...centroids.map((cen) => {
+        const dx = p[0] - cen[0], dy = p[1] - cen[1];
+        return dx * dx + dy * dy;
+      }));
+      return minDist;
+    });
+    const totalDist = dists.reduce((a, b) => a + b, 0);
+    let r = Math.random() * totalDist;
     for (let i = 0; i < n; i++) {
-      if (dist(points[idx], points[i]) <= epsilon) neighbors.push(i);
+      r -= dists[i];
+      if (r <= 0) { centroids.push([...points[i]]); break; }
     }
-    return neighbors;
+    if (centroids.length === c) centroids.push([...points[Math.floor(Math.random() * n)]]);
   }
 
-  for (let i = 0; i < n; i++) {
-    if (labels[i] !== -1) continue;
-    const neighbors = regionQuery(i);
-    if (neighbors.length < minPoints) continue; // noise
+  const labels = new Array(n).fill(0);
 
-    labels[i] = clusterId;
-    const queue = [...neighbors.filter((j) => j !== i)];
-    const visited = new Set([i]);
-
-    while (queue.length > 0) {
-      const j = queue.shift()!;
-      if (visited.has(j)) continue;
-      visited.add(j);
-
-      if (labels[j] === -1) labels[j] = clusterId; // was noise, claim it
-      if (labels[j] !== -1 && labels[j] !== clusterId) continue; // already in another cluster
-
-      labels[j] = clusterId;
-      const jNeighbors = regionQuery(j);
-      if (jNeighbors.length >= minPoints) {
-        for (const k of jNeighbors) {
-          if (!visited.has(k)) queue.push(k);
-        }
+  for (let iter = 0; iter < maxIter; iter++) {
+    // Assign each point to nearest centroid
+    let changed = false;
+    for (let i = 0; i < n; i++) {
+      let bestCluster = 0;
+      let bestDist = Infinity;
+      for (let c = 0; c < k; c++) {
+        const dx = points[i][0] - centroids[c][0];
+        const dy = points[i][1] - centroids[c][1];
+        const d = dx * dx + dy * dy;
+        if (d < bestDist) { bestDist = d; bestCluster = c; }
       }
+      if (labels[i] !== bestCluster) { labels[i] = bestCluster; changed = true; }
     }
-    clusterId++;
+
+    if (!changed) break;
+
+    // Recompute centroids
+    for (let c = 0; c < k; c++) {
+      const members = points.filter((_, i) => labels[i] === c);
+      if (members.length === 0) continue;
+      centroids[c][0] = members.reduce((s, p) => s + p[0], 0) / members.length;
+      centroids[c][1] = members.reduce((s, p) => s + p[1], 0) / members.length;
+    }
   }
 
   return labels;
+}
+
+// Choose k based on number of submissions (sqrt heuristic, capped)
+function chooseK(n: number): number {
+  if (n <= 5) return 2;
+  if (n <= 15) return 3;
+  if (n <= 30) return 4;
+  if (n <= 60) return 5;
+  return Math.min(8, Math.ceil(Math.sqrt(n)));
 }
 
 export const maxDuration = 60;
@@ -142,10 +158,9 @@ export async function POST() {
       padding + ((y - minY) / rangeY) * scale,
     ]);
 
-    // 6. Run DBSCAN clustering on 2D coordinates
-    const epsilon = 120;
-    const minPoints = 2;
-    const clusterAssignments = dbscan(normalized, epsilon, minPoints);
+    // 6. Run k-means clustering on 2D coordinates
+    const k = chooseK(withEmbeddings.length);
+    const clusterAssignments = kmeans(normalized, k);
 
     // 7. Clear old projections and write new ones
     await supabase.from("projection_cache").delete().neq("submission_id", "00000000-0000-0000-0000-000000000000");
@@ -154,7 +169,7 @@ export async function POST() {
       submission_id: s.id,
       x: Math.round(normalized[i][0]),
       y: Math.round(normalized[i][1]),
-      cluster_id: clusterAssignments[i] >= 0 ? clusterAssignments[i] : null,
+      cluster_id: clusterAssignments[i],
       computed_at: new Date().toISOString(),
     }));
 
@@ -168,7 +183,7 @@ export async function POST() {
     }
 
     // 8. Generate cluster labels (parallel to stay within timeout)
-    const clusterIds = [...new Set(clusterAssignments.filter((c) => c >= 0))];
+    const clusterIds = [...new Set(clusterAssignments)];
     await supabase.from("cluster_labels").delete().neq("cluster_id", -999);
 
     await Promise.all(
