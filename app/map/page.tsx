@@ -236,11 +236,19 @@ export default function MapPage() {
               onToggleMultiSelect={handleToggleMultiSelect}
             />
           </div>
-          {selectedNode && (
+          {(selectedNode || multiSelectIds.size > 0) && (
             <ConceptDetail
-              node={selectedNode}
+              node={selectedNode || (multiSelectIds.size > 0 ? data!.nodes.find((n) => multiSelectIds.has(n.id))! : null)!}
               researchers={data!.researchers}
-              onClose={() => setSelectedNodeId(null)}
+              onClose={() => { setSelectedNodeId(null); setMultiSelectIds(new Set()); }}
+              multiSelectedNodes={data!.nodes.filter((n) => multiSelectIds.has(n.id))}
+              onDeselectNode={(id) => {
+                setMultiSelectIds((prev) => {
+                  const next = new Set(prev);
+                  next.delete(id);
+                  return next;
+                });
+              }}
             />
           )}
           {selectedCluster && (
