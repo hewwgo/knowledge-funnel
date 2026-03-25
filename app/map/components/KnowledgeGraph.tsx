@@ -245,6 +245,8 @@ export default function KnowledgeGraph({
   useEffect(() => {
     if (!svgRef.current) return;
     const svg = d3.select(svgRef.current);
+
+    // Update node stroke highlights
     svg.selectAll<SVGCircleElement, MapNode>(".graph-node")
       .attr("stroke", (d) =>
         d.id === selectedNodeId ? "#262624"
@@ -256,7 +258,33 @@ export default function KnowledgeGraph({
         : multiSelectIds.has(d.id) ? 2.5
         : 1.5
       );
-  }, [selectedNodeId, multiSelectIds]);
+
+    // Draw connecting lines between multi-selected nodes
+    const g = svg.select("g");
+    g.selectAll(".multi-select-line").remove();
+
+    const selectedNodes = data.nodes.filter((n) => multiSelectIds.has(n.id));
+    if (selectedNodes.length >= 2) {
+      const xScale = d3.scaleLinear().domain([0, 1000]).range([80, svgRef.current.clientWidth - 80]);
+      const yScale = d3.scaleLinear().domain([0, 1000]).range([80, svgRef.current.clientHeight - 80]);
+
+      for (let i = 0; i < selectedNodes.length - 1; i++) {
+        const a = selectedNodes[i];
+        const b = selectedNodes[i + 1];
+        g.append("line")
+          .attr("class", "multi-select-line")
+          .attr("x1", xScale(a.x))
+          .attr("y1", yScale(a.y))
+          .attr("x2", xScale(b.x))
+          .attr("y2", yScale(b.y))
+          .attr("stroke", "#D55E00")
+          .attr("stroke-width", 1.5)
+          .attr("stroke-dasharray", "6,4")
+          .attr("opacity", 0.6)
+          .attr("pointer-events", "none");
+      }
+    }
+  }, [selectedNodeId, multiSelectIds, data.nodes]);
 
   return (
     <div className="map-canvas">
