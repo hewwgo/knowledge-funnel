@@ -81,16 +81,24 @@ async function generateIdeas(
     return `"${s.label}"${bodySnippet}`;
   }).join("\n");
 
-  const lockedDesc = lockedFacets.length > 0
-    ? `\n\nLocked constraints: ${lockedFacets.map((f) => `${f.name}: ${f.selectedValues.join(", ")}`).join("; ")}`
+  // Build explicit diverge/converge sections
+  const divergeSection = `=== SEEDS (DIVERGE — draw creative inspiration from these) ===
+${seedDescriptions}
+
+Use these submissions as creative raw material. Combine ideas from different seeds in unexpected ways. Each idea should draw from at least 2 seeds.`;
+
+  const convergeSection = lockedFacets.length > 0
+    ? `\n=== CONSTRAINTS (CONVERGE — every idea MUST satisfy ALL of these) ===
+${lockedFacets.map((f) => `${f.name}: MUST be one of [${f.selectedValues.join(", ")}]. Do NOT generate ideas outside these values.`).join("\n")}
+
+These are hard constraints. Every single generated idea must satisfy every constraint above. Ideas that violate any constraint are invalid.`
     : "";
 
   const sys = `You are a research idea generator for HCI, data visualization, and ubiquitous computing. You generate novel, specific, and concrete research ideas grounded in specific seed contributions. Respond ONLY with a JSON array. No markdown, no backticks, no preamble. Start with [ and end with ].`;
-  const prompt = `Here are the seed contributions from researchers:
-${seedDescriptions}
-${lockedDesc}
+  const prompt = `${divergeSection}
+${convergeSection}
 
-Generate exactly ${count} novel research ideas. Each idea MUST be grounded in at least 2 of the seeds above. For each idea, explicitly state which seeds it draws from and how each seed contributes to the idea.
+Generate exactly ${count} novel research ideas. For each idea, explicitly state which seeds it draws from and how each seed contributes.
 
 Each idea must be distinct from these existing ideas: ${JSON.stringify(existingTitles)}.
 
@@ -128,6 +136,48 @@ Only JSON.`;
     return JSON.parse(jsonMatch[0]);
   } catch {
     console.error("Parse error for facets:", raw.slice(0, 500));
+    return [];
+  }
+}
+
+async function discoverSingleFacet(
+  ideas: Idea[], existingFacetNames: string[], lockedFacetNames: string[]
+): Promise<Facet | null> {
+  const allAvoid = [...existingFacetNames, ...lockedFacetNames];
+  const sys = `You are an expert at taxonomic analysis of research ideas in HCI, visualization, and computing. Respond ONLY with a JSON array containing exactly 1 facet. No markdown, no backticks, no preamble.`;
+  const summaries = ideas.map((i) => `${i.title}: ${i.description.slice(0, 120)}`).join("\n");
+  const avoidClause = `You MUST avoid these existing and previously used facet names: ${allAvoid.join(", ")}. Generate a completely different dimension that reveals a new aspect of these ideas.`;
+  const prompt = `Given these research ideas:\n${summaries}\n\n${avoidClause}
+Propose exactly 1 NEW facet (dimension) that meaningfully characterizes and contrasts these ideas along an axis not yet covered.
+The facet should have 3 to 8 values and can be ordinal or categorical.
+Return a JSON array with exactly 1 element: [{"name": "Facet Name", "type": "categorical"|"ordinal", "values": ["Value1","Value2",...]}]`;
+  const raw = await callLLM(sys, prompt);
+  try {
+    const jsonMatch = raw.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) throw new Error("No JSON array found");
+    const arr = JSON.parse(jsonMatch[0]);
+    return arr.length > 0 ? arr[0] : null;
+  } catch {
+    console.error("Parse error for single facet:", raw.slice(0, 500));
+    return null;
+  }
+}
+
+async function classifySingleFacet(
+  ideas: { title: string; description: string }[], facet: Facet
+): Promise<{ index: number; values: string[] }[]> {
+  const sys = `You classify research ideas into facet values. Respond ONLY with a valid JSON array. Start with [ and end with ].`;
+  const facetDesc = `${facet.name}: [${facet.values.join(", ")}]`;
+  const titles = ideas.map((i, idx) => `${idx}: ${i.title}`).join("\n");
+  const prompt = `Facet:\n${facetDesc}\n\nIdeas:\n${titles}\n\nFor each idea (by index), assign one or more values from this facet.
+Return JSON array: [{"index": 0, "values": ["Value1"]}, ...]`;
+  const raw = await callLLM(sys, prompt);
+  try {
+    const jsonMatch = raw.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) throw new Error("No JSON array found");
+    return JSON.parse(jsonMatch[0]);
+  } catch {
+    console.error("Parse error for single facet classification:", raw.slice(0, 500));
     return [];
   }
 }
@@ -486,26 +536,67 @@ function ExploreInner() {
     });
   };
 
-  const handleLockFacet = (facetName: string) => {
+  const handleLockFacet = async (facetName: string) => {
     const vals = selectedValues[facetName] || [];
     if (vals.length === 0) return;
     const facet = facets.find((f) => f.name === facetName);
     if (!facet) return;
 
-    setLockedFacets((prev) => [...prev, { name: facetName, selectedValues: vals }]);
-    setFacets((prev) => prev.filter((f) => f.name !== facetName));
+    // 1. Lock the facet
+    const newLockedFacets = [...lockedFacets, { name: facetName, selectedValues: vals }];
+    setLockedFacets(newLockedFacets);
+    const remainingFacets = facets.filter((f) => f.name !== facetName);
+    setFacets(remainingFacets);
     setSelectedValues((prev) => {
       const next = { ...prev };
       delete next[facetName];
       return next;
     });
-    setIdeas((prev) =>
-      prev.filter((i) => {
-        const iVals = i.facetValues?.[facetName] || [];
-        return vals.some((v) => iVals.includes(v));
-      })
-    );
-    setStatus("Facet locked — will generate replacements");
+
+    // 2. Filter ideas to match locked value
+    const filteredIdeas = ideas.filter((i) => {
+      const iVals = i.facetValues?.[facetName] || [];
+      return vals.some((v) => iVals.includes(v));
+    });
+    setIdeas(filteredIdeas);
+
+    // 3. Discover a replacement facet
+    setStatus("Discovering new dimension...");
+    const allLockedNames = newLockedFacets.map((f) => f.name);
+    const existingNames = remainingFacets.map((f) => f.name);
+    const newFacet = await discoverSingleFacet(filteredIdeas, existingNames, allLockedNames);
+
+    if (newFacet) {
+      // 4. Classify existing ideas into the new facet
+      setStatus("Classifying ideas into new dimension...");
+      const classifications = await classifySingleFacet(
+        filteredIdeas.map(({ title, description }) => ({ title, description })),
+        newFacet
+      );
+
+      // Update ideas with new facet values
+      setIdeas((prev) => {
+        const updated = [...prev];
+        classifications.forEach((c) => {
+          if (c.index < updated.length) {
+            updated[c.index] = {
+              ...updated[c.index],
+              facetValues: {
+                ...updated[c.index].facetValues,
+                [newFacet.name]: c.values || [],
+              },
+            };
+          }
+        });
+        return updated;
+      });
+
+      // Add the new facet to the columns
+      setFacets((prev) => [...prev, newFacet]);
+      setStatus(`Locked "${facetName}" → new dimension: ${newFacet.name}`);
+    } else {
+      setStatus(`Locked "${facetName}" — could not discover new dimension`);
+    }
   };
 
   const handleDiscardFacet = (facetName: string) => {
