@@ -57,8 +57,14 @@ async function callLLM(systemPrompt: string, userPrompt: string): Promise<string
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ systemPrompt, userPrompt }),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "LLM call failed");
+  const text = await res.text();
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error(`LLM API returned invalid response: ${text.slice(0, 200)}`);
+  }
+  if (!res.ok) throw new Error(data.error || `LLM call failed (${res.status})`);
   return data.text;
 }
 

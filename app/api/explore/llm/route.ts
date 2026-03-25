@@ -34,6 +34,10 @@ export async function POST(request: Request) {
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : JSON.stringify(error);
     console.error("Explore LLM error:", msg);
+    // Check if API key is configured
+    if (!process.env.DEEPSEEK_API_KEY) {
+      return NextResponse.json({ error: "DEEPSEEK_API_KEY not configured in environment" }, { status: 500 });
+    }
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
