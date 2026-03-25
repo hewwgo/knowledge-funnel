@@ -143,7 +143,7 @@ export async function POST() {
     ]);
 
     // 6. Run DBSCAN clustering on 2D coordinates
-    const epsilon = 80;
+    const epsilon = 100;
     const minPoints = 2;
     const clusterAssignments = dbscan(normalized, epsilon, minPoints);
 
