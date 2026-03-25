@@ -10,10 +10,16 @@ interface Seed {
   body?: string;
 }
 
+interface Grounding {
+  seed: string;
+  contribution: string;
+}
+
 interface Idea {
   id: string;
   title: string;
   description: string;
+  grounding: Grounding[];
   facetValues: Record<string, string[]>;
 }
 
@@ -69,13 +75,29 @@ function buildConstraintString(seeds: Seed[], lockedFacets: LockedFacet[]): stri
 
 async function generateIdeas(
   seeds: Seed[], lockedFacets: LockedFacet[], existingTitles: string[], count: number
-): Promise<{ title: string; description: string }[]> {
-  const constraints = buildConstraintString(seeds, lockedFacets);
-  const sys = `You are a research idea generator for HCI, data visualization, and ubiquitous computing. You generate novel, specific, and concrete research ideas. Respond ONLY with a JSON array. No markdown, no backticks, no preamble.`;
-  const prompt = `Generate exactly ${count} novel research ideas that satisfy these constraints: [${constraints}].
+): Promise<{ title: string; description: string; grounding: Grounding[] }[]> {
+  const seedDescriptions = seeds.map((s) => {
+    const bodySnippet = s.body ? ` — ${s.body.slice(0, 300)}` : "";
+    return `"${s.label}"${bodySnippet}`;
+  }).join("\n");
+
+  const lockedDesc = lockedFacets.length > 0
+    ? `\n\nLocked constraints: ${lockedFacets.map((f) => `${f.name}: ${f.selectedValues.join(", ")}`).join("; ")}`
+    : "";
+
+  const sys = `You are a research idea generator for HCI, data visualization, and ubiquitous computing. You generate novel, specific, and concrete research ideas grounded in specific seed contributions. Respond ONLY with a JSON array. No markdown, no backticks, no preamble. Start with [ and end with ].`;
+  const prompt = `Here are the seed contributions from researchers:
+${seedDescriptions}
+${lockedDesc}
+
+Generate exactly ${count} novel research ideas. Each idea MUST be grounded in at least 2 of the seeds above. For each idea, explicitly state which seeds it draws from and how each seed contributes to the idea.
+
 Each idea must be distinct from these existing ideas: ${JSON.stringify(existingTitles)}.
-Return a JSON array where each element is: {"title": "Evocative short title", "description": "One paragraph describing the idea concretely."}
-Only JSON, nothing else.`;
+
+Return a JSON array where each element is:
+{"title": "Evocative short title", "description": "One paragraph describing the idea concretely.", "grounding": [{"seed": "exact seed title", "contribution": "one sentence explaining how this seed shaped the idea"}]}
+
+Every idea must have a "grounding" array with 2-${Math.min(seeds.length, 4)} entries. Only reference seeds by their exact title from the list above.`;
   const raw = await callLLM(sys, prompt);
   try {
     const jsonMatch = raw.match(/\[[\s\S]*\]/);
@@ -262,6 +284,31 @@ function IdeaDetail({ idea, facets, onClose }: {
       <div style={{ width: 14, height: 14, borderRadius: "50%", background: color, marginBottom: 12 }} />
       <h3 style={{ fontSize: 15, fontWeight: 700, color: "#262624", margin: "0 0 12px 0", lineHeight: 1.3 }}>{idea.title}</h3>
       <p style={{ fontSize: 13, color: "rgba(38,38,36,0.7)", lineHeight: 1.6, margin: "0 0 20px 0" }}>{idea.description}</p>
+      {/* Grounding / Provenance */}
+      {idea.grounding && idea.grounding.length > 0 && (
+        <>
+          <div style={{ fontSize: 10, color: "rgba(38,38,36,0.4)", textTransform: "uppercase", marginBottom: 10, letterSpacing: "0.06em", fontWeight: 600 }}>
+            Grounded In
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
+            {idea.grounding.map((g, i) => (
+              <div key={i} style={{
+                padding: "8px 10px",
+                border: "1.5px solid rgba(213, 94, 0, 0.2)",
+                background: "rgba(213, 94, 0, 0.03)",
+              }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "#D55E00", marginBottom: 3, lineHeight: 1.3 }}>
+                  {g.seed}
+                </div>
+                <div style={{ fontSize: 11, color: "rgba(38,38,36,0.6)", lineHeight: 1.5 }}>
+                  {g.contribution}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
       <div style={{ fontSize: 10, color: "rgba(38,38,36,0.4)", textTransform: "uppercase", marginBottom: 8, letterSpacing: "0.06em", fontWeight: 600 }}>Classification</div>
       {facets.map((f) => {
         const vals = idea.facetValues?.[f.name] || [];
