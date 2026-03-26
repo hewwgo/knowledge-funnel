@@ -726,7 +726,10 @@ function ExploreInner() {
         )}
         {facets.length > 0 && (
           <div style={{ display: "flex", gap: 10, height: "calc(100vh - 200px)" }}>
-            {facets.map((f) => (
+            {facets.filter((f) => {
+              // Only show facets that have at least 1 idea in any value
+              return f.values.some((v) => ideas.some((i) => i.facetValues?.[f.name]?.includes(v)));
+            }).map((f) => (
               <FacetColumn
                 key={f.name}
                 facet={f}
