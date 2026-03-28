@@ -333,9 +333,34 @@ function FacetColumn({ facet, ideas, selectedValues, onToggleValue, onLock, onDi
 }
 
 // ── Idea Detail Panel ─────────────────────────────────────────────
-function IdeaDetail({ idea, facets, onClose }: {
-  idea: Idea; facets: Facet[]; onClose: () => void;
+function IdeaDetail({ idea, facets, onClose, lockedFacets }: {
+  idea: Idea; facets: Facet[]; onClose: () => void; lockedFacets: LockedFacet[];
 }) {
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const facetPath = lockedFacets.map((f) => `${f.name}: ${f.selectedValues.join(", ")}`).join(" → ");
+      const res = await fetch("/api/explore/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: idea.title,
+          description: idea.description,
+          grounding: idea.grounding || [],
+          facetPath,
+        }),
+      });
+      if (!res.ok) throw new Error("Save failed");
+      setSaved(true);
+    } catch (err) {
+      console.error("Save error:", err);
+    }
+    setSaving(false);
+  };
+
   const color = hashColor(idea.title);
   return (
     <div className="explore-detail">
@@ -382,6 +407,30 @@ function IdeaDetail({ idea, facets, onClose }: {
           </div>
         );
       })}
+
+      {/* Save to Funnel */}
+      <div style={{ marginTop: 24, paddingTop: 16, borderTop: "1px solid rgba(212, 165, 116, 0.3)" }}>
+        <button
+          onClick={handleSave}
+          disabled={saving || saved}
+          className="map-btn"
+          style={{
+            width: "100%",
+            padding: "10px",
+            fontSize: 12,
+            background: saved ? "#009E73" : "#262624",
+            borderColor: saved ? "#009E73" : "#262624",
+            color: "#fff",
+          }}
+        >
+          {saved ? "✓ Saved to Knowledge Map" : saving ? "Saving..." : "Save to Funnel"}
+        </button>
+        {saved && (
+          <p style={{ fontSize: 10, color: "rgba(38,38,36,0.4)", marginTop: 6, textAlign: "center" }}>
+            This idea will appear on the map after recompute.
+          </p>
+        )}
+      </div>
     </div>
   );
 }
@@ -796,7 +845,7 @@ function ExploreInner() {
       </div>
 
       {/* Idea detail slide-out */}
-      {selectedIdea && <IdeaDetail idea={selectedIdea} facets={facets} onClose={() => setSelectedIdea(null)} />}
+      {selectedIdea && <IdeaDetail idea={selectedIdea} facets={facets} lockedFacets={lockedFacets} onClose={() => setSelectedIdea(null)} />}
 
       <style>{`@keyframes explore-pulse { 0%,100% { opacity:1 } 50% { opacity:0.3 } }`}</style>
     </div>
