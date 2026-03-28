@@ -912,13 +912,16 @@ body {
   display: none;
   position: fixed;
   z-index: 100;
-  background: #262624;
+  background: rgba(38, 38, 36, 0.95);
+  backdrop-filter: blur(8px);
   color: #ffffff;
-  padding: 10px 14px;
+  padding: 12px 16px;
   font-size: 12px;
   line-height: 1.5;
-  max-width: 280px;
+  max-width: 320px;
   pointer-events: none;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
 }
 
 /* Detail panel */

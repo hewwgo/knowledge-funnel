@@ -222,6 +222,13 @@ export default function MapPage() {
             toggleResearcher={toggleResearcher}
             searchQuery={searchQuery}
             setSearchQuery={setSearchQuery}
+            totalNodes={data!.nodes.length}
+            matchingNodes={searchQuery
+              ? data!.nodes.filter((n) =>
+                  n.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  n.concepts.some((c) => c.toLowerCase().includes(searchQuery.toLowerCase()))
+                ).length
+              : data!.nodes.length}
           />
           <div className="map-canvas-container">
             <KnowledgeGraph
