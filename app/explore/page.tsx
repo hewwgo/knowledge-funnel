@@ -581,6 +581,7 @@ function ExploreInner() {
     const allLockedNames = newLockedFacets.map((f) => f.name);
     const existingNames = remainingFacets.map((f) => f.name);
     const newFacet = await discoverSingleFacet(filteredIdeas, existingNames, allLockedNames);
+    let allFacetsAfterLock: Facet[] = remainingFacets;
 
     if (newFacet) {
       // 4. Classify existing ideas into the new facet
@@ -609,10 +610,49 @@ function ExploreInner() {
 
       // Add the new facet to the columns
       setFacets((prev) => [...prev, newFacet]);
-      setStatus(`Locked "${facetName}" → new dimension: ${newFacet.name}`);
+      allFacetsAfterLock = [...remainingFacets, newFacet];
     } else {
-      setStatus(`Locked "${facetName}" — could not discover new dimension`);
+      allFacetsAfterLock = remainingFacets;
     }
+
+    // 5. Backfill: generate replacement ideas to maintain target count
+    const deficit = targetCount - filteredIdeas.length;
+    if (deficit > 0) {
+      setStatus(`Backfilling ${deficit} ideas...`);
+      const existingTitles = filteredIdeas.map((i) => i.title);
+      const batchCount = Math.min(deficit, BATCH_SIZE);
+      const backfillBatch = await generateIdeas(seeds, newLockedFacets, existingTitles, batchCount);
+      const backfillTagged: Idea[] = backfillBatch.map((item) => ({
+        ...item,
+        id: `idea-${++idCounter.current}`,
+        facetValues: {},
+      }));
+      // Dedup
+      const seen = new Set(existingTitles);
+      const uniqueBackfill = backfillTagged.filter((i) => {
+        if (seen.has(i.title)) return false;
+        seen.add(i.title);
+        return true;
+      });
+
+      if (uniqueBackfill.length > 0 && allFacetsAfterLock.length > 0) {
+        setStatus("Classifying new ideas...");
+        const classified = await classifyIdeas(
+          uniqueBackfill.map(({ title, description }) => ({ title, description })),
+          allFacetsAfterLock
+        );
+        classified.forEach((c) => {
+          if (c.index < uniqueBackfill.length) {
+            uniqueBackfill[c.index].facetValues = c.facets || {};
+          }
+        });
+      }
+      setIdeas((prev) => [...prev, ...uniqueBackfill]);
+    }
+
+    setStatus(newFacet
+      ? `Locked "${facetName}" → new dimension: ${newFacet.name}`
+      : `Locked "${facetName}"`);
   };
 
   const handleDiscardFacet = (facetName: string) => {
