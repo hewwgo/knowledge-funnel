@@ -472,8 +472,15 @@ function ExploreInner() {
           id: `idea-${++idCounter.current}`,
           facetValues: {},
         }));
-        allNew = [...allNew, ...tagged];
-        setIdeas((prev) => [...prev, ...tagged]);
+        // Deduplicate by title — avoid LLM generating same title twice
+        const seenTitles = new Set([...ideas.map((i) => i.title), ...allNew.map((i) => i.title)]);
+        const unique = tagged.filter((i) => {
+          if (seenTitles.has(i.title)) return false;
+          seenTitles.add(i.title);
+          return true;
+        });
+        allNew = [...allNew, ...unique];
+        setIdeas((prev) => [...prev, ...unique]);
       }
 
       if (abortRef.current) { setGenerating(false); return; }
