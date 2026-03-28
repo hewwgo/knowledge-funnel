@@ -79,7 +79,7 @@ export async function generateEmbeddings(
 export async function generateTags(
   text: string
 ): Promise<{ tag: string; confidence: number }[]> {
-  const truncated = text.slice(0, 4000);
+  const truncated = text.slice(0, 8000);
 
   const response = await deepseek.chat.completions.create({
     model: "deepseek-chat",

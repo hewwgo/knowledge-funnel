@@ -5,7 +5,9 @@ import type { MapNode, Researcher } from "../page";
 interface Props {
   node: MapNode;
   researchers: Researcher[];
+  allNodes: MapNode[];
   onClose: () => void;
+  onSelectNode?: (id: string) => void;
   multiSelectedNodes?: MapNode[];
   onDeselectNode?: (id: string) => void;
 }
@@ -13,7 +15,9 @@ interface Props {
 export default function ConceptDetail({
   node,
   researchers,
+  allNodes,
   onClose,
+  onSelectNode,
   multiSelectedNodes = [],
   onDeselectNode,
 }: Props) {
@@ -108,6 +112,44 @@ export default function ConceptDetail({
             </div>
           </div>
         )}
+
+        {/* Other submissions by same researcher */}
+        {(() => {
+          const others = allNodes.filter(
+            (n) => n.submitterId === node.submitterId && n.id !== node.id
+          );
+          if (others.length === 0) return null;
+          return (
+            <div className="map-detail-neighbors" style={{ marginTop: 16 }}>
+              <h4 className="map-detail-section-title">
+                Other by {node.submitterName} ({others.length})
+              </h4>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {others.slice(0, 5).map((o) => (
+                  <button
+                    key={o.id}
+                    onClick={() => onSelectNode?.(o.id)}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 6,
+                      padding: "6px 8px", background: "rgba(255,255,255,0.6)",
+                      border: "1px solid rgba(212,165,116,0.2)",
+                      cursor: "pointer", textAlign: "left", fontFamily: "Inter, sans-serif",
+                      width: "100%",
+                    }}
+                  >
+                    <span style={{
+                      width: 6, height: 6, borderRadius: "50%",
+                      background: o.submitterColor, flexShrink: 0,
+                    }} />
+                    <span style={{ fontSize: 10, color: "#262624", lineHeight: 1.3 }}>
+                      {o.title}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Meta */}
         <div style={{ marginTop: 16, fontSize: "11px", color: "#888" }}>

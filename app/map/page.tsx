@@ -248,7 +248,9 @@ export default function MapPage() {
             <ConceptDetail
               node={selectedNode || (multiSelectIds.size > 0 ? data!.nodes.find((n) => multiSelectIds.has(n.id))! : null)!}
               researchers={data!.researchers}
+              allNodes={data!.nodes}
               onClose={() => { setSelectedNodeId(null); setMultiSelectIds(new Set()); }}
+              onSelectNode={handleSelectNode}
               multiSelectedNodes={data!.nodes.filter((n) => multiSelectIds.has(n.id))}
               onDeselectNode={(id) => {
                 setMultiSelectIds((prev) => {

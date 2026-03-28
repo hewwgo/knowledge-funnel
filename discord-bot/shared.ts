@@ -436,7 +436,7 @@ export async function embedSubmission(
   body: string
 ): Promise<void> {
   try {
-    const text = `${title || ""}\n\n${body || ""}`.trim().slice(0, 4000);
+    const text = `${title || ""}\n\n${body || ""}`.trim().slice(0, 8000);
     if (text.length < 20) return;
 
     const res = await fetch("https://api.voyageai.com/v1/embeddings", {
@@ -492,7 +492,7 @@ async function llmExtractConcepts(
   body: string,
   existingConcepts?: string[]
 ): Promise<{ concepts: ExtractedConcept[]; relationships: ExtractedRelationship[] }> {
-  const text = `${title || ""}\n\n${body || ""}`.trim().slice(0, 4000);
+  const text = `${title || ""}\n\n${body || ""}`.trim().slice(0, 8000);
 
   const existingSection = existingConcepts && existingConcepts.length > 0
     ? `\n\nEXISTING CONCEPTS IN THE KNOWLEDGE BASE:\n${existingConcepts.join(", ")}\n\nYou MUST reuse an existing concept if the meaning is similar. Do NOT create "reflective friction" if "reflective design" exists — use the existing one. Only create a new specific concept if nothing in the list above covers it.`
