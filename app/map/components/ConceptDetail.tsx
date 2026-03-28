@@ -63,7 +63,31 @@ export default function ConceptDetail({
           </div>
         )}
 
-        {/* Concepts/tags */}
+        {/* Distinctive concepts (TF-IDF) */}
+        {node.distinctiveConcepts && node.distinctiveConcepts.length > 0 && (
+          <div className="map-detail-neighbors">
+            <h4 className="map-detail-section-title">What Makes This Distinctive</h4>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+              {node.distinctiveConcepts.map((c) => (
+                <span
+                  key={c}
+                  style={{
+                    background: "rgba(213, 94, 0, 0.08)",
+                    border: "1px solid rgba(213, 94, 0, 0.2)",
+                    padding: "3px 8px",
+                    fontSize: "11px",
+                    fontWeight: 600,
+                    color: "#D55E00",
+                  }}
+                >
+                  {c}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* All concepts/tags */}
         {node.concepts.length > 0 && (
           <div className="map-detail-neighbors">
             <h4 className="map-detail-section-title">Concepts</h4>

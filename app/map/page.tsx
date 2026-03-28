@@ -18,6 +18,7 @@ export interface MapNode {
   submitterName: string;
   submitterColor: string;
   concepts: string[];
+  distinctiveConcepts: string[];
   createdAt: string;
 }
 

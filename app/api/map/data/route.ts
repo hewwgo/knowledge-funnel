@@ -40,6 +40,7 @@ export async function GET() {
       .select("submission_id, concepts!inner(label)");
 
     const conceptsBySubmission = new Map<string, string[]>();
+    const conceptFrequency = new Map<string, number>(); // corpus-wide frequency
     for (const link of conceptLinks || []) {
       const subId = link.submission_id;
       const label = (link.concepts as unknown as { label: string })?.label;
@@ -48,7 +49,9 @@ export async function GET() {
         conceptsBySubmission.set(subId, []);
       }
       conceptsBySubmission.get(subId)!.push(label);
+      conceptFrequency.set(label, (conceptFrequency.get(label) || 0) + 1);
     }
+    const totalSubmissions = projections?.length || 1;
 
     // 3. Fetch cluster labels
     const { data: clusterLabelsData } = await supabase
@@ -99,6 +102,13 @@ export async function GET() {
         submitterName: profile.name,
         submitterColor: researcher.color,
         concepts: conceptsBySubmission.get(sub.id) || [],
+        distinctiveConcepts: (conceptsBySubmission.get(sub.id) || [])
+          .filter((c) => {
+            const freq = conceptFrequency.get(c) || 0;
+            // Concept appears in less than 30% of submissions = distinctive
+            return freq <= Math.max(2, totalSubmissions * 0.3);
+          })
+          .sort((a, b) => (conceptFrequency.get(a) || 0) - (conceptFrequency.get(b) || 0)),
         createdAt: sub.created_at,
       };
     });
