@@ -498,6 +498,7 @@ function ExploreInner() {
   const [brushedIds, setBrushedIds] = useState<Set<string> | null>(null);
   const [newSeed, setNewSeed] = useState("");
   const [seedsLoaded, setSeedsLoaded] = useState(false);
+  const [seedsExpanded, setSeedsExpanded] = useState(true);
 
   const idCounter = useRef(0);
   const abortRef = useRef(false);
@@ -780,8 +781,6 @@ function ExploreInner() {
       </div>
     );
   }
-
-  const [seedsExpanded, setSeedsExpanded] = useState(true);
 
   const activeFacets = facets.filter((f) =>
     f.values.some((v) => ideas.some((i) => i.facetValues?.[f.name]?.includes(v)))
