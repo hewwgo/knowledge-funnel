@@ -100,16 +100,16 @@ ${lockedFacets.map((f) => `${f.name}: MUST be one of [${f.selectedValues.join(",
 These are hard constraints. Every single generated idea must satisfy every constraint above. Ideas that violate any constraint are invalid.`
     : "";
 
-  const sys = `You are a research idea generator for HCI, data visualization, and ubiquitous computing. You generate novel, specific, and concrete research ideas grounded in specific seed contributions. Respond ONLY with a JSON array. No markdown, no backticks, no preamble. Start with [ and end with ].`;
+  const sys = `You are a research direction advisor for HCI, data visualization, and ubiquitous computing. You suggest promising research directions grounded in specific seed contributions. Your tone is suggestive and forward-looking — frame each idea as a direction worth exploring, not a finished project. Respond ONLY with a JSON array. No markdown, no backticks, no preamble. Start with [ and end with ].`;
   const prompt = `${divergeSection}
 ${convergeSection}
 
-Generate exactly ${count} novel research ideas. For each idea, explicitly state which seeds it draws from and how each seed contributes.
+Generate exactly ${count} promising research directions. Frame each as a pitch: why is this direction interesting? What could a team explore? How might it be executed? Use suggestive language ("could explore", "might investigate", "a promising direction would be") rather than declarative ("this system does", "we present").
 
-Each idea must be distinct from these existing ideas: ${JSON.stringify(existingTitles)}.
+Each direction must be distinct from these existing ideas: ${JSON.stringify(existingTitles)}.
 
 Return a JSON array where each element is:
-{"title": "Evocative short title", "description": "One paragraph describing the idea concretely.", "grounding": [{"seed": "exact seed title", "contribution": "one sentence explaining how this seed shaped the idea"}]}
+{"title": "Evocative short title (not a paper title — more like a concept name)", "description": "One paragraph pitching the direction: what makes it interesting, what could be explored, and a concrete angle for how a team might approach it.", "grounding": [{"seed": "exact seed title", "contribution": "one sentence explaining how this seed inspired this direction"}]}
 
 Every idea must have a "grounding" array with 2-${Math.min(seeds.length, 4)} entries. Only reference seeds by their exact title from the list above.`;
   const raw = await callLLM(sys, prompt);
@@ -332,7 +332,53 @@ function FacetColumn({ facet, ideas, selectedValues, onToggleValue, onLock, onDi
   );
 }
 
-// ── Idea Detail Panel ─────────────────────────────────────────────
+// ── Save Button ───────────────────────────────────────────────────
+function SaveButton({ idea, lockedFacets }: { idea: Idea; lockedFacets: LockedFacet[] }) {
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const facetPath = lockedFacets.map((f) => `${f.name}: ${f.selectedValues.join(", ")}`).join(" → ");
+      const res = await fetch("/api/explore/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: idea.title,
+          description: idea.description,
+          grounding: idea.grounding || [],
+          facetPath,
+        }),
+      });
+      if (!res.ok) throw new Error("Save failed");
+      setSaved(true);
+    } catch (err) {
+      console.error("Save error:", err);
+    }
+    setSaving(false);
+  };
+
+  return (
+    <div style={{ marginTop: 10 }}>
+      <button
+        onClick={handleSave}
+        disabled={saving || saved}
+        className="map-btn"
+        style={{
+          width: "100%", padding: "8px", fontSize: 11,
+          background: saved ? "#009E73" : "#262624",
+          borderColor: saved ? "#009E73" : "#262624",
+          color: "#fff",
+        }}
+      >
+        {saved ? "Saved to Map" : saving ? "Saving..." : "Save to Funnel"}
+      </button>
+    </div>
+  );
+}
+
+// ── Idea Detail Panel (kept for reference but no longer used as slide-out) ──
 function IdeaDetail({ idea, facets, onClose, lockedFacets }: {
   idea: Idea; facets: Facet[]; onClose: () => void; lockedFacets: LockedFacet[];
 }) {
@@ -735,51 +781,30 @@ function ExploreInner() {
     );
   }
 
+  const [seedsExpanded, setSeedsExpanded] = useState(true);
+
+  const activeFacets = facets.filter((f) =>
+    f.values.some((v) => ideas.some((i) => i.facetValues?.[f.name]?.includes(v)))
+  );
+
   return (
     <div className="map-page" style={{ overflow: "hidden" }}>
       {/* Header */}
       <header className="map-header">
         <div className="map-header-left">
           <a href="/map" className="map-back">&larr;</a>
-          <h1 className="map-title">Idea Explorer</h1>
+          <h1 className="map-title">Composition</h1>
           {ideas.length > 0 && (
             <span className="map-computed-at">
-              {ideas.length} ideas &middot; {facets.length} facets
+              {ideas.length} directions &middot; {activeFacets.length} dimensions
             </span>
           )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 11, color: "rgba(38,38,36,0.5)" }}>
-            {generating && <span style={{ display: "inline-block", animation: "explore-pulse 1s infinite", marginRight: 6, color: "#D55E00" }}>●</span>}
-            {status}
-          </span>
-        </div>
-      </header>
-
-      {/* Query bar */}
-      <div className="explore-query-bar">
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          <span className="explore-section-label">Seeds</span>
-          {seeds.map((s, i) => (
-            <Chip key={`s-${i}`} type={s.type} label={s.label} onRemove={() => handleRemoveSeed(i)} />
-          ))}
-          {lockedFacets.map((f, i) => (
-            <Chip key={`l-${i}`} type={f.name} label={f.selectedValues.join(", ")} locked onRemove={() => handleRemoveLocked(i)} />
-          ))}
-          <input
-            value={newSeed}
-            onChange={(e) => setNewSeed(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleAddSeed()}
-            placeholder="Add seed..."
-            className="explore-seed-input"
-          />
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
-          <span className="explore-section-label">Generator</span>
           <button
             onClick={generating ? handlePause : runGeneration}
             className="map-btn"
-            style={{ padding: "5px 16px", fontSize: 11 }}
+            style={{ padding: "5px 14px", fontSize: 11 }}
             disabled={seeds.length === 0}
           >
             {generating ? "Pause" : "Generate"}
@@ -787,65 +812,184 @@ function ExploreInner() {
           <button
             onClick={handleClear}
             className="map-btn"
-            style={{ padding: "5px 16px", fontSize: 11, background: "transparent", color: "#262624" }}
+            style={{ padding: "5px 14px", fontSize: 11, background: "transparent", color: "#262624" }}
           >
             Clear
           </button>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 12 }}>
-            <span style={{ fontSize: 11, color: "rgba(38,38,36,0.5)" }}>Target:</span>
-            <input
-              type="range" min={5} max={50} value={targetCount}
-              onChange={(e) => setTargetCount(Number(e.target.value))}
-              style={{ width: 80 }}
-            />
-            <span style={{ fontSize: 12, color: "rgba(38,38,36,0.6)", fontFamily: "monospace", width: 24 }}>
-              {targetCount}
+          {generating && (
+            <span style={{ fontSize: 10, color: "rgba(38,38,36,0.4)" }}>
+              <span style={{ display: "inline-block", animation: "explore-pulse 1s infinite", marginRight: 4, color: "#D55E00" }}>●</span>
+              {status}
             </span>
+          )}
+        </div>
+      </header>
+
+      {/* Centered tool area */}
+      <div style={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column", alignItems: "center" }}>
+        <div style={{ width: "100%", maxWidth: 1100, padding: "12px 24px" }}>
+
+          {/* Seeds — compact, collapsible */}
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+              <button
+                onClick={() => setSeedsExpanded(!seedsExpanded)}
+                style={{
+                  background: "none", border: "none", cursor: "pointer", padding: 0,
+                  fontSize: 10, color: "rgba(38,38,36,0.4)", fontFamily: "Inter, sans-serif",
+                  fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em",
+                }}
+              >
+                {seedsExpanded ? "▾" : "▸"} Seeds ({seeds.length})
+              </button>
+              {lockedFacets.length > 0 && (
+                <span style={{ fontSize: 10, color: "rgba(0,158,115,0.6)", fontWeight: 600 }}>
+                  + {lockedFacets.length} locked
+                </span>
+              )}
+              <div style={{ flex: 1 }} />
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 10, color: "rgba(38,38,36,0.4)" }}>Target:</span>
+                <input
+                  type="range" min={5} max={50} value={targetCount}
+                  onChange={(e) => setTargetCount(Number(e.target.value))}
+                  style={{ width: 60 }}
+                />
+                <span style={{ fontSize: 11, color: "rgba(38,38,36,0.5)", fontFamily: "monospace", width: 20 }}>
+                  {targetCount}
+                </span>
+              </div>
+            </div>
+            {seedsExpanded && (
+              <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                {seeds.map((s, i) => (
+                  <Chip key={`s-${i}`} type={s.type} label={s.label} onRemove={() => handleRemoveSeed(i)} />
+                ))}
+                {lockedFacets.map((f, i) => (
+                  <Chip key={`l-${i}`} type={f.name} label={f.selectedValues.join(", ")} locked onRemove={() => handleRemoveLocked(i)} />
+                ))}
+                <input
+                  value={newSeed}
+                  onChange={(e) => setNewSeed(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleAddSeed()}
+                  placeholder="Add seed..."
+                  className="explore-seed-input"
+                />
+              </div>
+            )}
           </div>
+
+          {/* Facet columns */}
+          {facets.length === 0 && ideas.length === 0 && !generating && (
+            <div className="explore-empty">
+              {seeds.length === 0
+                ? <>Select submissions from the <a href="/map" style={{ color: "#262624", fontWeight: 600 }}>knowledge map</a> to begin.</>
+                : <>Press <strong>Generate</strong> to explore the idea space.</>
+              }
+            </div>
+          )}
+          {facets.length === 0 && generating && (
+            <div className="explore-empty">
+              Generating directions and discovering dimensions...
+            </div>
+          )}
+          {activeFacets.length > 0 && (
+            <div style={{ display: "flex", gap: 8, height: selectedIdea ? "35vh" : "calc(100vh - 220px)", transition: "height 0.2s ease" }}>
+              {activeFacets.map((f) => (
+                <FacetColumn
+                  key={f.name}
+                  facet={f}
+                  ideas={ideas}
+                  selectedValues={selectedValues[f.name] || []}
+                  onToggleValue={handleToggleValue}
+                  onLock={handleLockFacet}
+                  onDiscard={handleDiscardFacet}
+                  hoveredIdea={hoveredIdea}
+                  onHoverIdea={setHoveredIdea}
+                  onClickIdea={setSelectedIdea}
+                  brushedIds={brushedIds}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Idea detail — below facets, inline */}
+          {selectedIdea && (
+            <div style={{
+              marginTop: 10,
+              border: "1.5px solid rgba(212, 165, 116, 0.3)",
+              background: "#fff4eb",
+              padding: "20px 24px",
+              position: "relative",
+            }}>
+              <button
+                onClick={() => setSelectedIdea(null)}
+                style={{
+                  position: "absolute", top: 10, right: 14,
+                  background: "none", border: "none", color: "#262624",
+                  fontSize: 18, cursor: "pointer", padding: 0, lineHeight: 1,
+                }}
+              >&times;</button>
+
+              <div style={{ display: "flex", gap: 24 }}>
+                {/* Left: title + description */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <div style={{ width: 12, height: 12, borderRadius: "50%", background: hashColor(selectedIdea.title), flexShrink: 0 }} />
+                    <h3 style={{ fontSize: 15, fontWeight: 700, color: "#262624", margin: 0, lineHeight: 1.3 }}>
+                      {selectedIdea.title}
+                    </h3>
+                  </div>
+                  <p style={{ fontSize: 13, color: "rgba(38,38,36,0.7)", lineHeight: 1.7, margin: 0 }}>
+                    {selectedIdea.description}
+                  </p>
+
+                  {/* Classification */}
+                  <div style={{ marginTop: 14, display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {activeFacets.map((f) => {
+                      const vals = selectedIdea.facetValues?.[f.name] || [];
+                      if (vals.length === 0) return null;
+                      return vals.map((v) => (
+                        <span key={`${f.name}-${v}`} className="explore-detail-tag">
+                          {v}
+                        </span>
+                      ));
+                    })}
+                  </div>
+                </div>
+
+                {/* Right: grounding */}
+                {selectedIdea.grounding && selectedIdea.grounding.length > 0 && (
+                  <div style={{ width: 320, flexShrink: 0 }}>
+                    <div style={{ fontSize: 10, color: "rgba(38,38,36,0.4)", textTransform: "uppercase", marginBottom: 8, letterSpacing: "0.06em", fontWeight: 600 }}>
+                      Grounded In
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {selectedIdea.grounding.map((g, i) => (
+                        <div key={i} style={{
+                          padding: "6px 10px",
+                          border: "1.5px solid rgba(213, 94, 0, 0.15)",
+                          background: "rgba(213, 94, 0, 0.03)",
+                        }}>
+                          <div style={{ fontSize: 10, fontWeight: 600, color: "#D55E00", marginBottom: 2, lineHeight: 1.3 }}>
+                            {g.seed}
+                          </div>
+                          <div style={{ fontSize: 10, color: "rgba(38,38,36,0.55)", lineHeight: 1.5 }}>
+                            {g.contribution}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Save to Funnel */}
+                    <SaveButton idea={selectedIdea} lockedFacets={lockedFacets} />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
-
-      {/* Main area: faceted browser */}
-      <div style={{ flex: 1, padding: 12, overflow: "auto" }}>
-        {facets.length === 0 && ideas.length === 0 && !generating && (
-          <div className="explore-empty">
-            {seeds.length === 0
-              ? <>Add seeds above or <a href="/map" style={{ color: "#262624", fontWeight: 600 }}>select submissions from the map</a>.</>
-              : <>Press <strong>Generate</strong> to begin exploring the idea space.</>
-            }
-          </div>
-        )}
-        {facets.length === 0 && generating && (
-          <div className="explore-empty">
-            Generating initial ideas and discovering facets...
-          </div>
-        )}
-        {facets.length > 0 && (
-          <div style={{ display: "flex", gap: 10, height: "calc(100vh - 200px)" }}>
-            {facets.filter((f) => {
-              // Only show facets that have at least 1 idea in any value
-              return f.values.some((v) => ideas.some((i) => i.facetValues?.[f.name]?.includes(v)));
-            }).map((f) => (
-              <FacetColumn
-                key={f.name}
-                facet={f}
-                ideas={ideas}
-                selectedValues={selectedValues[f.name] || []}
-                onToggleValue={handleToggleValue}
-                onLock={handleLockFacet}
-                onDiscard={handleDiscardFacet}
-                hoveredIdea={hoveredIdea}
-                onHoverIdea={setHoveredIdea}
-                onClickIdea={setSelectedIdea}
-                brushedIds={brushedIds}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Idea detail slide-out */}
-      {selectedIdea && <IdeaDetail idea={selectedIdea} facets={facets} lockedFacets={lockedFacets} onClose={() => setSelectedIdea(null)} />}
 
       <style>{`@keyframes explore-pulse { 0%,100% { opacity:1 } 50% { opacity:0.3 } }`}</style>
     </div>

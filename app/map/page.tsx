@@ -179,7 +179,7 @@ export default function MapPage() {
       <header className="map-header">
         <div className="map-header-left">
           <a href="/" className="map-back">&larr;</a>
-          <h1 className="map-title">Knowledge Map</h1>
+          <h1 className="map-title">Tessera &mdash; Knowledge Map</h1>
           {data && data.nodes.length > 0 && (
             <span className="map-computed-at">
               {data.nodes.length} submissions &middot; {data.clusters.length} clusters
