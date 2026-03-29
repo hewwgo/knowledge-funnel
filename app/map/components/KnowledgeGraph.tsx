@@ -16,30 +16,12 @@ interface Props {
   onToggleMultiSelect: (id: string) => void;
 }
 
-// Soft cluster palette
-const CLUSTER_FILLS = [
-  "rgba(230, 159, 0, 0.06)",
-  "rgba(86, 180, 233, 0.06)",
-  "rgba(0, 158, 115, 0.06)",
-  "rgba(204, 121, 167, 0.06)",
-  "rgba(0, 114, 178, 0.06)",
-  "rgba(213, 94, 0, 0.06)",
-  "rgba(240, 228, 66, 0.06)",
-  "rgba(102, 166, 30, 0.06)",
+// Cluster palette
+const CLUSTER_COLORS = [
+  "#E69F00", "#56B4E9", "#009E73", "#CC79A7",
+  "#0072B2", "#D55E00", "#F0E442", "#66A61E",
 ];
 
-const CLUSTER_STROKES = [
-  "rgba(230, 159, 0, 0.18)",
-  "rgba(86, 180, 233, 0.18)",
-  "rgba(0, 158, 115, 0.18)",
-  "rgba(204, 121, 167, 0.18)",
-  "rgba(0, 114, 178, 0.18)",
-  "rgba(213, 94, 0, 0.18)",
-  "rgba(240, 228, 66, 0.18)",
-  "rgba(102, 166, 30, 0.18)",
-];
-
-// Hex color to rgba helper
 function hexToRgba(hex: string, alpha: number): string {
   const r = parseInt(hex.slice(1, 3), 16);
   const g = parseInt(hex.slice(3, 5), 16);
@@ -48,15 +30,10 @@ function hexToRgba(hex: string, alpha: number): string {
 }
 
 export default function KnowledgeGraph({
-  data,
-  hiddenResearchers,
-  searchQuery,
-  onSelectNode,
-  selectedNodeId,
-  onSelectCluster,
-  selectedClusterId,
-  multiSelectIds,
-  onToggleMultiSelect,
+  data, hiddenResearchers, searchQuery,
+  onSelectNode, selectedNodeId,
+  onSelectCluster, selectedClusterId,
+  multiSelectIds, onToggleMultiSelect,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
@@ -64,12 +41,10 @@ export default function KnowledgeGraph({
   const isNodeActive = useCallback(
     (node: MapNode) => {
       if (hiddenResearchers.has(node.submitterId)) return false;
-      if (
-        searchQuery &&
+      if (searchQuery &&
         !node.title.toLowerCase().includes(searchQuery.toLowerCase()) &&
         !node.concepts.some((c) => c.toLowerCase().includes(searchQuery.toLowerCase()))
-      )
-        return false;
+      ) return false;
       return true;
     },
     [hiddenResearchers, searchQuery]
@@ -91,156 +66,180 @@ export default function KnowledgeGraph({
     const xScale = d3.scaleLinear().domain([0, 1000]).range([100, width - 100]);
     const yScale = d3.scaleLinear().domain([0, 1000]).range([100, height - 100]);
 
-    // Defs for filters
+    // Defs
     const defs = svg.append("defs");
-
-    // Gaussian blur for cluster regions
-    const blurFilter = defs.append("filter").attr("id", "cluster-blur")
-      .attr("x", "-30%").attr("y", "-30%").attr("width", "160%").attr("height", "160%");
-    blurFilter.append("feGaussianBlur").attr("in", "SourceGraphic").attr("stdDeviation", "18");
+    const blur = defs.append("filter").attr("id", "blob-blur")
+      .attr("x", "-40%").attr("y", "-40%").attr("width", "180%").attr("height", "180%");
+    blur.append("feGaussianBlur").attr("in", "SourceGraphic").attr("stdDeviation", "20");
 
     const g = svg.append("g");
 
     // Zoom
-    const zoom = d3
-      .zoom<SVGSVGElement, unknown>()
-      .scaleExtent([0.3, 8])
+    const zoom = d3.zoom<SVGSVGElement, unknown>()
+      .scaleExtent([0.25, 10])
       .on("zoom", (event) => {
         g.attr("transform", event.transform);
         applySemanticZoom(event.transform.k);
       });
     svg.call(zoom);
+    svg.on("click", () => { onSelectNode(""); onSelectCluster(-1); });
 
-    svg.on("click", () => {
-      onSelectNode("");
-      onSelectCluster(-1);
-    });
-
-    // ── Layer 1: Cluster regions (soft blobs) ──
-    const hullGroup = g.append("g").attr("class", "hulls");
-
-    for (const cluster of clusters) {
-      if (cluster.points.length < 3) continue;
-
+    // ── Precompute cluster data ──
+    const clusterData = clusters.map((cluster) => {
+      const colorIdx = cluster.id % CLUSTER_COLORS.length;
+      const color = CLUSTER_COLORS[colorIdx];
+      const cx = xScale(cluster.centroidX);
+      const cy = yScale(cluster.centroidY);
       const scaledPoints: [number, number][] = cluster.points.map(
         ([x, y]) => [xScale(x), yScale(y)]
       );
+      // Cluster radius = max distance from centroid to any point
+      const radius = Math.max(40, ...scaledPoints.map(([x, y]) =>
+        Math.sqrt((x - cx) ** 2 + (y - cy) ** 2)
+      ));
+      return { ...cluster, color, cx, cy, scaledPoints, radius };
+    });
 
-      const hull = d3.polygonHull(scaledPoints);
+    // ── Layer 1: Cluster blobs (soft background) ──
+    const hullGroup = g.append("g").attr("class", "hulls");
+
+    for (const c of clusterData) {
+      if (c.scaledPoints.length < 3) continue;
+
+      const hull = d3.polygonHull(c.scaledPoints);
       if (!hull) continue;
 
-      const cx = xScale(cluster.centroidX);
-      const cy = yScale(cluster.centroidY);
-
-      // Expand hull generously
       const expandedHull = hull.map(([x, y]) => {
-        const dx = x - cx;
-        const dy = y - cy;
+        const dx = x - c.cx;
+        const dy = y - c.cy;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        const expand = 45;
-        return [
-          x + (dx / (dist || 1)) * expand,
-          y + (dy / (dist || 1)) * expand,
-        ] as [number, number];
+        return [x + (dx / (dist || 1)) * 45, y + (dy / (dist || 1)) * 45] as [number, number];
       });
 
       const line = d3.line().curve(d3.curveCatmullRomClosed.alpha(0.5));
-      const isSelected = cluster.id === selectedClusterId;
-      const colorIdx = cluster.id % CLUSTER_FILLS.length;
+      const isSelected = c.id === selectedClusterId;
 
-      // Blurred background blob
-      hullGroup
-        .append("path")
+      // Blurred blob
+      hullGroup.append("path")
         .attr("d", line(expandedHull))
-        .attr("fill", isSelected
-          ? CLUSTER_FILLS[colorIdx].replace("0.06", "0.12")
-          : CLUSTER_FILLS[colorIdx])
+        .attr("fill", hexToRgba(c.color, isSelected ? 0.12 : 0.06))
         .attr("stroke", "none")
-        .attr("filter", "url(#cluster-blur)")
+        .attr("filter", "url(#blob-blur)")
         .attr("class", "cluster-blob");
 
-      // Crisp outline on top
-      hullGroup
-        .append("path")
+      // Outline
+      hullGroup.append("path")
         .attr("d", line(expandedHull))
         .attr("fill", "none")
-        .attr("stroke", isSelected
-          ? CLUSTER_STROKES[colorIdx].replace("0.18", "0.4")
-          : CLUSTER_STROKES[colorIdx])
+        .attr("stroke", hexToRgba(c.color, isSelected ? 0.35 : 0.15))
         .attr("stroke-width", isSelected ? 1.5 : 0.75)
-        .attr("class", "cluster-hull")
+        .attr("class", "cluster-outline")
         .attr("cursor", "pointer")
-        .on("click", (event) => {
-          event.stopPropagation();
-          onSelectCluster(cluster.id);
-        });
+        .on("click", (event) => { event.stopPropagation(); onSelectCluster(c.id); });
+    }
 
-      // Cluster label — large, at top of hull
-      const topY = Math.min(...scaledPoints.map(p => p[1]));
-      hullGroup
-        .append("text")
-        .attr("x", cx)
-        .attr("y", topY - 20)
+    // ── Layer 2: Cluster mega-dots (visible when very zoomed out) ──
+    const megaDotGroup = g.append("g").attr("class", "mega-dots");
+
+    for (const c of clusterData) {
+      const megaR = Math.max(20, Math.min(40, c.memberCount * 4));
+
+      // Big dot
+      megaDotGroup.append("circle")
+        .attr("cx", c.cx)
+        .attr("cy", c.cy)
+        .attr("r", megaR)
+        .attr("fill", hexToRgba(c.color, 0.25))
+        .attr("stroke", hexToRgba(c.color, 0.5))
+        .attr("stroke-width", 2)
+        .attr("class", "mega-dot")
+        .attr("cursor", "pointer")
+        .on("click", (event) => { event.stopPropagation(); onSelectCluster(c.id); });
+
+      // Mega-dot label
+      megaDotGroup.append("text")
+        .attr("x", c.cx)
+        .attr("y", c.cy + megaR + 16)
         .attr("text-anchor", "middle")
-        .attr("fill", isSelected ? "rgba(38, 38, 36, 0.65)" : "rgba(38, 38, 36, 0.3)")
+        .attr("fill", "#262624")
+        .attr("font-size", "12px")
+        .attr("font-weight", "700")
+        .attr("letter-spacing", "0.03em")
+        .attr("class", "mega-dot-label")
+        .text(c.label);
+
+      // Count inside dot
+      megaDotGroup.append("text")
+        .attr("x", c.cx)
+        .attr("y", c.cy + 4)
+        .attr("text-anchor", "middle")
+        .attr("fill", hexToRgba(c.color, 0.8))
         .attr("font-size", "13px")
         .attr("font-weight", "700")
-        .attr("letter-spacing", "0.06em")
+        .attr("class", "mega-dot-count")
+        .text(c.memberCount);
+    }
+
+    // ── Layer 3: Cluster labels (mid-zoom) ──
+    const labelGroup = g.append("g").attr("class", "cluster-labels");
+
+    for (const c of clusterData) {
+      if (c.scaledPoints.length < 2) continue;
+      const topY = Math.min(...c.scaledPoints.map(p => p[1]));
+
+      labelGroup.append("text")
+        .attr("x", c.cx)
+        .attr("y", topY - 18)
+        .attr("text-anchor", "middle")
+        .attr("fill", hexToRgba(c.color, 0.7))
+        .attr("font-size", "11px")
+        .attr("font-weight", "700")
+        .attr("letter-spacing", "0.05em")
         .attr("class", "cluster-label")
         .attr("cursor", "pointer")
-        .on("click", (event) => {
-          event.stopPropagation();
-          onSelectCluster(cluster.id);
-        })
-        .text(cluster.label);
+        .attr("opacity", 0)
+        .on("click", (event) => { event.stopPropagation(); onSelectCluster(c.id); })
+        .text(c.label);
     }
 
-    // ── Layer 2: Nearest-neighbor edges within clusters ──
+    // ── Layer 4: NN edges ──
     const edgeGroup = g.append("g").attr("class", "nn-edges");
-
-    // For each cluster, connect each node to its nearest neighbor in same cluster
-    const clusterNodes = new Map<number, MapNode[]>();
+    const clusterMembers = new Map<number, MapNode[]>();
     for (const n of nodes) {
-      if (n.clusterId === null || n.clusterId === undefined) continue;
-      if (!clusterNodes.has(n.clusterId)) clusterNodes.set(n.clusterId, []);
-      clusterNodes.get(n.clusterId)!.push(n);
+      if (n.clusterId == null) continue;
+      if (!clusterMembers.has(n.clusterId)) clusterMembers.set(n.clusterId, []);
+      clusterMembers.get(n.clusterId)!.push(n);
     }
-
     const drawnEdges = new Set<string>();
-    for (const [, members] of clusterNodes) {
+    for (const [, members] of clusterMembers) {
       if (members.length < 2) continue;
-      for (const node of members) {
+      for (const n of members) {
         let nearest: MapNode | null = null;
         let nearestDist = Infinity;
-        for (const other of members) {
-          if (other.id === node.id) continue;
-          const dx = node.x - other.x;
-          const dy = node.y - other.y;
-          const d = dx * dx + dy * dy;
-          if (d < nearestDist) { nearestDist = d; nearest = other; }
+        for (const o of members) {
+          if (o.id === n.id) continue;
+          const d = (n.x - o.x) ** 2 + (n.y - o.y) ** 2;
+          if (d < nearestDist) { nearestDist = d; nearest = o; }
         }
         if (!nearest) continue;
-        const edgeKey = [node.id, nearest.id].sort().join("-");
-        if (drawnEdges.has(edgeKey)) continue;
-        drawnEdges.add(edgeKey);
-
-        edgeGroup
-          .append("line")
-          .attr("x1", xScale(node.x))
-          .attr("y1", yScale(node.y))
-          .attr("x2", xScale(nearest.x))
-          .attr("y2", yScale(nearest.y))
-          .attr("stroke", "rgba(38, 38, 36, 0.06)")
+        const key = [n.id, nearest.id].sort().join("-");
+        if (drawnEdges.has(key)) continue;
+        drawnEdges.add(key);
+        edgeGroup.append("line")
+          .attr("x1", xScale(n.x)).attr("y1", yScale(n.y))
+          .attr("x2", xScale(nearest.x)).attr("y2", yScale(nearest.y))
+          .attr("stroke", "rgba(38,38,36,0.06)")
           .attr("stroke-width", 0.75)
-          .attr("class", "nn-edge");
+          .attr("class", "nn-edge")
+          .attr("opacity", 0);
       }
     }
 
-    // ── Layer 3: Nodes (cards that collapse to dots) ──
+    // ── Layer 5: Nodes ──
     const nodeGroup = g.append("g").attr("class", "nodes");
     const NODE_R = 6;
-    const CARD_W = 160;
-    const CARD_H = 42;
+    const CARD_W = 165;
+    const CARD_H = 40;
 
     const node = nodeGroup
       .selectAll<SVGGElement, MapNode>("g")
@@ -248,63 +247,48 @@ export default function KnowledgeGraph({
       .join("g")
       .attr("class", "graph-node-group")
       .attr("transform", (d) => `translate(${xScale(d.x)},${yScale(d.y)})`)
-      .attr("cursor", "pointer");
+      .attr("cursor", "pointer")
+      .attr("opacity", 0); // start hidden, semantic zoom reveals
 
-    // Card background rect (visible when zoomed in)
-    node
-      .append("rect")
+    // Card rect
+    node.append("rect")
       .attr("class", "graph-card")
-      .attr("x", -CARD_W / 2)
-      .attr("y", -CARD_H / 2)
-      .attr("width", CARD_W)
-      .attr("height", CARD_H)
+      .attr("x", -CARD_W / 2).attr("y", -CARD_H / 2)
+      .attr("width", CARD_W).attr("height", CARD_H)
       .attr("rx", 2)
-      .attr("fill", (d) => hexToRgba(d.submitterColor, 0.06))
+      .attr("fill", (d) => hexToRgba(d.submitterColor, 0.07))
       .attr("stroke", (d) => hexToRgba(d.submitterColor, 0.2))
       .attr("stroke-width", 1)
-      .attr("opacity", 0)
-      .attr("filter", "drop-shadow(0 1px 3px rgba(0,0,0,0.06))");
+      .attr("opacity", 0);
 
-    // Card title text (visible when zoomed in)
-    node
-      .append("text")
+    // Card title
+    node.append("text")
       .attr("class", "graph-card-title")
-      .attr("x", -CARD_W / 2 + 10)
-      .attr("y", -4)
+      .attr("x", -CARD_W / 2 + 10).attr("y", -2)
       .attr("fill", "#262624")
-      .attr("font-size", "9px")
-      .attr("font-weight", "600")
+      .attr("font-size", "9px").attr("font-weight", "600")
       .attr("opacity", 0)
-      .text((d) => {
-        const t = d.title || "";
-        return t.length > 28 ? t.slice(0, 26) + "…" : t;
-      });
+      .text((d) => d.title.length > 28 ? d.title.slice(0, 26) + "…" : d.title);
 
-    // Card submitter text
-    node
-      .append("text")
+    // Card submitter
+    node.append("text")
       .attr("class", "graph-card-submitter")
-      .attr("x", -CARD_W / 2 + 10)
-      .attr("y", 10)
+      .attr("x", -CARD_W / 2 + 10).attr("y", 11)
       .attr("fill", "rgba(38,38,36,0.4)")
       .attr("font-size", "8px")
-      .attr("font-weight", "400")
       .attr("opacity", 0)
       .text((d) => d.submitterName);
 
-    // Dot circle (visible when zoomed out — the default)
-    node
-      .append("circle")
+    // Dot
+    node.append("circle")
       .attr("r", NODE_R)
       .attr("fill", (d) => d.submitterColor)
       .attr("class", "graph-node")
       .attr("stroke", "white")
-      .attr("stroke-width", 1.5)
-      .attr("filter", "drop-shadow(0 1px 2px rgba(0,0,0,0.08))");
+      .attr("stroke-width", 1.5);
 
-    // Hover glow
-    node
-      .append("circle")
+    // Glow
+    node.append("circle")
       .attr("r", NODE_R + 6)
       .attr("fill", "none")
       .attr("stroke", (d) => d.submitterColor)
@@ -312,62 +296,76 @@ export default function KnowledgeGraph({
       .attr("opacity", 0)
       .attr("class", "graph-node-glow");
 
-    // ── Semantic zoom ──
+    // ── Semantic zoom — 3 levels ──
     function applySemanticZoom(k: number) {
-      const showCards = k > 2.0;
-      const showEdges = k > 1.2;
+      const LEVEL_OVERVIEW = k < 0.7;  // Mega-dots only
+      const LEVEL_MID = k >= 0.7 && k < 2.2; // Dots + cluster labels + edges
+      const LEVEL_DETAIL = k >= 2.2;   // Cards
 
+      // Mega-dots: visible only at overview
+      megaDotGroup.selectAll(".mega-dot, .mega-dot-label, .mega-dot-count")
+        .attr("opacity", LEVEL_OVERVIEW ? 1 : 0);
+
+      // Cluster blobs: visible at mid and detail
+      hullGroup.selectAll(".cluster-blob, .cluster-outline")
+        .attr("opacity", LEVEL_OVERVIEW ? 0 : 1);
+
+      // Cluster labels: visible at mid
+      labelGroup.selectAll(".cluster-label")
+        .attr("opacity", LEVEL_MID ? 0.7 : LEVEL_DETAIL ? 0.25 : 0);
+
+      // NN edges: visible at mid and detail
+      edgeGroup.selectAll(".nn-edge")
+        .attr("opacity", LEVEL_MID ? 0.08 : LEVEL_DETAIL ? 0.05 : 0);
+
+      // Nodes
       node.each(function (d) {
         const el = d3.select(this);
         const active = isNodeActive(d);
+
+        if (LEVEL_OVERVIEW) {
+          el.attr("opacity", 0);
+          return;
+        }
 
         if (!active) {
           el.attr("opacity", 0.06);
           return;
         }
+
         el.attr("opacity", 1);
 
-        // Toggle card vs dot
-        el.select(".graph-card").attr("opacity", showCards ? 1 : 0);
-        el.select(".graph-card-title").attr("opacity", showCards ? 1 : 0);
-        el.select(".graph-card-submitter").attr("opacity", showCards && k > 2.5 ? 1 : 0);
-        el.select(".graph-node").attr("opacity", showCards ? 0 : 1);
+        if (LEVEL_DETAIL) {
+          el.select(".graph-card").attr("opacity", 1);
+          el.select(".graph-card-title").attr("opacity", 1);
+          el.select(".graph-card-submitter").attr("opacity", k > 3 ? 1 : 0);
+          el.select(".graph-node").attr("opacity", 0);
+        } else {
+          el.select(".graph-card").attr("opacity", 0);
+          el.select(".graph-card-title").attr("opacity", 0);
+          el.select(".graph-card-submitter").attr("opacity", 0);
+          el.select(".graph-node").attr("opacity", 1);
+        }
       });
-
-      // NN edges fade in
-      edgeGroup.selectAll(".nn-edge")
-        .attr("opacity", showEdges ? 0.08 : 0);
-
-      // Cluster labels
-      hullGroup.selectAll<SVGTextElement, unknown>(".cluster-label")
-        .attr("opacity", k > 3 ? 0.15 : k < 0.7 ? 0.4 : 0.3);
     }
 
     // ── Interactions ──
     node
       .on("mouseenter", (event, d) => {
         if (!isNodeActive(d)) return;
-
         d3.select(event.currentTarget).select(".graph-node-glow")
           .attr("stroke-width", 2).attr("opacity", 0.3);
         d3.select(event.currentTarget).select(".graph-node")
           .transition().duration(80).attr("r", NODE_R + 2);
 
-        const contentIcon =
-          d.contentType === "paper" ? "📄" :
-          d.contentType === "link" ? "🔗" :
-          d.contentType === "idea" ? "💡" : "📝";
-
-        tooltip
-          .style("display", "block")
+        const icon = d.contentType === "paper" ? "📄" : d.contentType === "link" ? "🔗" : d.contentType === "idea" ? "💡" : "📝";
+        tooltip.style("display", "block")
           .style("left", `${event.pageX + 14}px`)
           .style("top", `${event.pageY - 14}px`)
           .html(
-            `<div style="margin-bottom:4px"><strong>${contentIcon} ${d.title}</strong></div>` +
+            `<div style="margin-bottom:4px"><strong>${icon} ${d.title}</strong></div>` +
             `<div style="color:rgba(255,255,255,0.6);font-size:11px;margin-bottom:3px">by ${d.submitterName}</div>` +
-            (d.concepts.length > 0
-              ? `<div style="color:rgba(255,255,255,0.4);font-size:10px">${d.concepts.join(" · ")}</div>`
-              : "") +
+            (d.concepts.length > 0 ? `<div style="color:rgba(255,255,255,0.4);font-size:10px">${d.concepts.join(" · ")}</div>` : "") +
             `<div style="color:rgba(255,255,255,0.3);font-size:9px;margin-top:4px">Click to inspect · Shift+click to select</div>`
           );
       })
@@ -384,11 +382,8 @@ export default function KnowledgeGraph({
       .on("click", (event, d) => {
         event.stopPropagation();
         if (!isNodeActive(d)) return;
-        if (event.shiftKey) {
-          onToggleMultiSelect(d.id);
-        } else {
-          onSelectNode(d.id);
-        }
+        if (event.shiftKey) onToggleMultiSelect(d.id);
+        else onSelectNode(d.id);
       });
 
     applySemanticZoom(1);
@@ -396,69 +391,47 @@ export default function KnowledgeGraph({
     return () => { svg.selectAll("*").remove(); };
   }, [data, hiddenResearchers, searchQuery, isNodeActive, onSelectNode, onSelectCluster, selectedClusterId]);
 
-  // Selection highlight effect
+  // Selection highlight
   useEffect(() => {
     if (!svgRef.current) return;
     const svg = d3.select(svgRef.current);
 
     svg.selectAll<SVGCircleElement, MapNode>(".graph-node")
       .attr("stroke", (d) =>
-        d.id === selectedNodeId ? "#262624"
-        : multiSelectIds.has(d.id) ? "#D55E00"
-        : "white"
-      )
+        d.id === selectedNodeId ? "#262624" : multiSelectIds.has(d.id) ? "#D55E00" : "white")
       .attr("stroke-width", (d) =>
-        d.id === selectedNodeId ? 2.5
-        : multiSelectIds.has(d.id) ? 2
-        : 1.5
-      );
+        d.id === selectedNodeId ? 2.5 : multiSelectIds.has(d.id) ? 2 : 1.5);
 
-    // Card highlight
     svg.selectAll<SVGRectElement, MapNode>(".graph-card")
       .attr("stroke-width", (d) =>
-        d.id === selectedNodeId ? 2
-        : multiSelectIds.has(d.id) ? 2
-        : 1
-      )
+        d.id === selectedNodeId ? 2 : multiSelectIds.has(d.id) ? 2 : 1)
       .attr("stroke", (d) =>
-        d.id === selectedNodeId ? "#262624"
-        : multiSelectIds.has(d.id) ? "#D55E00"
-        : hexToRgba(d.submitterColor, 0.2)
-      );
+        d.id === selectedNodeId ? "#262624" : multiSelectIds.has(d.id) ? "#D55E00" : hexToRgba(d.submitterColor, 0.2));
 
-    // Multi-select connecting lines
+    // Multi-select lines
     const g = svg.select("g");
     g.selectAll(".multi-select-line").remove();
-
-    const selectedNodes = data.nodes.filter((n) => multiSelectIds.has(n.id));
-    if (selectedNodes.length >= 2) {
-      const xScale = d3.scaleLinear().domain([0, 1000]).range([100, svgRef.current.clientWidth - 100]);
-      const yScale = d3.scaleLinear().domain([0, 1000]).range([100, svgRef.current.clientHeight - 100]);
-
-      for (let i = 0; i < selectedNodes.length - 1; i++) {
-        const a = selectedNodes[i];
-        const b = selectedNodes[i + 1];
-        g.append("line")
-          .attr("class", "multi-select-line")
-          .attr("x1", xScale(a.x)).attr("y1", yScale(a.y))
-          .attr("x2", xScale(b.x)).attr("y2", yScale(b.y))
-          .attr("stroke", "#D55E00")
-          .attr("stroke-width", 1.5)
-          .attr("stroke-dasharray", "6,4")
-          .attr("opacity", 0.5)
+    const sel = data.nodes.filter((n) => multiSelectIds.has(n.id));
+    if (sel.length >= 2) {
+      const xs = d3.scaleLinear().domain([0, 1000]).range([100, svgRef.current.clientWidth - 100]);
+      const ys = d3.scaleLinear().domain([0, 1000]).range([100, svgRef.current.clientHeight - 100]);
+      for (let i = 0; i < sel.length - 1; i++) {
+        g.append("line").attr("class", "multi-select-line")
+          .attr("x1", xs(sel[i].x)).attr("y1", ys(sel[i].y))
+          .attr("x2", xs(sel[i + 1].x)).attr("y2", ys(sel[i + 1].y))
+          .attr("stroke", "#D55E00").attr("stroke-width", 1.5)
+          .attr("stroke-dasharray", "6,4").attr("opacity", 0.5)
           .attr("pointer-events", "none");
       }
     }
 
-    // Search highlight glow
+    // Search glow
     if (searchQuery) {
       svg.selectAll<SVGGElement, MapNode>(".graph-node-group").each(function (d) {
-        const matches =
-          d.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        const matches = d.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
           d.concepts.some((c) => c.toLowerCase().includes(searchQuery.toLowerCase()));
         d3.select(this).select(".graph-node-glow")
-          .attr("stroke-width", matches ? 2 : 0)
-          .attr("opacity", matches ? 0.4 : 0);
+          .attr("stroke-width", matches ? 2 : 0).attr("opacity", matches ? 0.4 : 0);
       });
     } else {
       svg.selectAll(".graph-node-glow").attr("stroke-width", 0).attr("opacity", 0);

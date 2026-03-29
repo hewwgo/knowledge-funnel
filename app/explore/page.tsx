@@ -88,30 +88,42 @@ async function generateIdeas(
   }).join("\n");
 
   // Build explicit diverge/converge sections
-  const divergeSection = `=== SEEDS (DIVERGE — draw creative inspiration from these) ===
+  const divergeSection = `=== SEEDS (starting points — go BEYOND these, not within them) ===
 ${seedDescriptions}
 
-Use these submissions as creative raw material. Combine ideas from different seeds in unexpected ways. Each idea should draw from at least 2 seeds.`;
+These are springboards, not boundaries. The seeds represent what the researchers already know. Your job is to DIVERGE: generate directions that EXTEND, COMBINE, or REFRAME the seeds into territory the researchers haven't considered. Surprise them. Cross disciplinary lines. Propose unexpected intersections.`;
 
   const convergeSection = lockedFacets.length > 0
-    ? `\n=== CONSTRAINTS (CONVERGE — every idea MUST satisfy ALL of these) ===
+    ? `\n=== LOCKED DIMENSIONS (hard constraints — every idea MUST satisfy ALL) ===
 ${lockedFacets.map((f) => `${f.name}: MUST be one of [${f.selectedValues.join(", ")}]. Do NOT generate ideas outside these values.`).join("\n")}
 
-These are hard constraints. Every single generated idea must satisfy every constraint above. Ideas that violate any constraint are invalid.`
+These are non-negotiable. Every generated idea must satisfy every constraint. But within these constraints, still push for novelty and surprise.`
     : "";
 
-  const sys = `You are a research direction advisor for HCI, data visualization, and ubiquitous computing. You suggest promising research directions grounded in specific seed contributions. Your tone is suggestive and forward-looking — frame each idea as a direction worth exploring, not a finished project. Respond ONLY with a JSON array. No markdown, no backticks, no preamble. Start with [ and end with ].`;
+  const sys = `You are a creative research provocateur for HCI and related fields. You take researchers' existing work as seeds and generate bold, unexpected research directions that go BEYOND what the researchers have already thought about. You are not summarizing their work — you are opening new doors from it.
+
+CRITICAL RULES for descriptions:
+- NEVER start with "A promising direction..." or any formulaic opening. Every description must start differently.
+- Write as if pitching to the researchers directly. They are experts — don't explain basics.
+- Each direction should make a researcher think "I hadn't considered that angle."
+- Be concrete about what could be built, studied, or tested — not abstract hand-waving.
+- Frame as open questions and possibilities, not finished projects.
+
+Respond ONLY with a JSON array. No markdown, no backticks, no preamble. Start with [ and end with ].`;
+
   const prompt = `${divergeSection}
 ${convergeSection}
 
-Generate exactly ${count} promising research directions. Frame each as a pitch: why is this direction interesting? What could a team explore? How might it be executed? Use suggestive language ("could explore", "might investigate", "a promising direction would be") rather than declarative ("this system does", "we present").
+Generate exactly ${count} research directions. Each should open a genuinely new angle that the seed researchers likely haven't explored.
 
-Each direction must be distinct from these existing ideas: ${JSON.stringify(existingTitles)}.
+Vary your openings — some could start with a question ("What if..."), a provocation ("Most systems assume X, but..."), a scenario ("Imagine a researcher who..."), or a concrete proposal ("Build a system that..."). NEVER repeat the same opening pattern.
 
-Return a JSON array where each element is:
-{"title": "Evocative short title (not a paper title — more like a concept name)", "description": "One paragraph pitching the direction: what makes it interesting, what could be explored, and a concrete angle for how a team might approach it.", "grounding": [{"seed": "exact seed title", "contribution": "one sentence explaining how this seed inspired this direction"}]}
+Each direction must be distinct from: ${JSON.stringify(existingTitles)}.
 
-Every idea must have a "grounding" array with 2-${Math.min(seeds.length, 4)} entries. Only reference seeds by their exact title from the list above.`;
+Return a JSON array:
+{"title": "Short evocative concept name (2-5 words, not a paper title)", "description": "A direct, thought-provoking pitch. What's the core insight? What could be built or studied? Why would this matter? Be specific and bold.", "grounding": [{"seed": "exact seed title", "contribution": "one sentence on how this seed sparked this direction — not just 'provides context' but the specific leap taken"}]}
+
+Every idea needs a "grounding" array with 2-${Math.min(seeds.length, 4)} entries. Only reference seeds by exact title.`;
   const raw = await callLLM(sys, prompt);
   try {
     const jsonMatch = raw.match(/\[[\s\S]*\]/);
