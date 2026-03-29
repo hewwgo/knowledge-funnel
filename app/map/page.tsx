@@ -274,7 +274,7 @@ export default function MapPage() {
             <div className="map-selection-bar">
               <span>{multiSelectIds.size} selected</span>
               <button className="map-selection-explore" onClick={handleExploreSelected}>
-                Explore Ideas
+                Compose
               </button>
               <button onClick={() => setMultiSelectIds(new Set())}>
                 Clear
