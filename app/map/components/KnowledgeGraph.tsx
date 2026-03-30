@@ -159,10 +159,10 @@ export default function KnowledgeGraph({
       // Mega-dot label
       megaDotGroup.append("text")
         .attr("x", c.cx)
-        .attr("y", c.cy + megaR + 16)
+        .attr("y", c.cy + megaR + 18)
         .attr("text-anchor", "middle")
         .attr("fill", "#262624")
-        .attr("font-size", "12px")
+        .attr("font-size", "14px")
         .attr("font-weight", "700")
         .attr("letter-spacing", "0.03em")
         .attr("class", "mega-dot-label")
@@ -191,10 +191,10 @@ export default function KnowledgeGraph({
         .attr("x", c.cx)
         .attr("y", topY - 18)
         .attr("text-anchor", "middle")
-        .attr("fill", hexToRgba(c.color, 0.7))
-        .attr("font-size", "11px")
+        .attr("fill", hexToRgba(c.color, 0.85))
+        .attr("font-size", "13px")
         .attr("font-weight", "700")
-        .attr("letter-spacing", "0.05em")
+        .attr("letter-spacing", "0.04em")
         .attr("class", "cluster-label")
         .attr("cursor", "pointer")
         .attr("opacity", 0)
@@ -310,9 +310,10 @@ export default function KnowledgeGraph({
       hullGroup.selectAll(".cluster-blob, .cluster-outline")
         .attr("opacity", LEVEL_OVERVIEW ? 0 : 1);
 
-      // Cluster labels: visible at mid
-      labelGroup.selectAll(".cluster-label")
-        .attr("opacity", LEVEL_MID ? 0.7 : LEVEL_DETAIL ? 0.25 : 0);
+      // Cluster labels: visible at mid, scale inversely with zoom for readability
+      labelGroup.selectAll<SVGTextElement, unknown>(".cluster-label")
+        .attr("opacity", LEVEL_MID ? 0.8 : LEVEL_DETAIL ? 0.35 : 0)
+        .attr("font-size", `${Math.max(10, Math.min(16, 13 / k))}px`);
 
       // NN edges: visible at mid and detail
       edgeGroup.selectAll(".nn-edge")

@@ -216,59 +216,70 @@ export default function MapPage() {
           </button>
         </div>
       ) : (
-        <div className="map-layout">
-          <MapControls
-            researchers={data!.researchers}
+        <div className="map-fullscreen">
+          {/* Full-screen canvas */}
+          <KnowledgeGraph
+            data={data!}
             hiddenResearchers={hiddenResearchers}
-            toggleResearcher={toggleResearcher}
             searchQuery={searchQuery}
-            setSearchQuery={setSearchQuery}
-            totalNodes={data!.nodes.length}
-            matchingNodes={searchQuery
-              ? data!.nodes.filter((n) =>
-                  n.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                  n.concepts.some((c) => c.toLowerCase().includes(searchQuery.toLowerCase()))
-                ).length
-              : data!.nodes.length}
+            onSelectNode={handleSelectNode}
+            selectedNodeId={selectedNodeId}
+            onSelectCluster={handleSelectCluster}
+            selectedClusterId={selectedClusterId}
+            multiSelectIds={multiSelectIds}
+            onToggleMultiSelect={handleToggleMultiSelect}
           />
-          <div className="map-canvas-container">
-            <KnowledgeGraph
-              data={data!}
+
+          {/* Floating controls — top left */}
+          <div className="map-float-controls">
+            <MapControls
+              researchers={data!.researchers}
               hiddenResearchers={hiddenResearchers}
+              toggleResearcher={toggleResearcher}
               searchQuery={searchQuery}
-              onSelectNode={handleSelectNode}
-              selectedNodeId={selectedNodeId}
-              onSelectCluster={handleSelectCluster}
-              selectedClusterId={selectedClusterId}
-              multiSelectIds={multiSelectIds}
-              onToggleMultiSelect={handleToggleMultiSelect}
+              setSearchQuery={setSearchQuery}
+              totalNodes={data!.nodes.length}
+              matchingNodes={searchQuery
+                ? data!.nodes.filter((n) =>
+                    n.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    n.concepts.some((c) => c.toLowerCase().includes(searchQuery.toLowerCase()))
+                  ).length
+                : data!.nodes.length}
             />
           </div>
+
+          {/* Floating detail panel — right side */}
           {(selectedNode || multiSelectIds.size > 0) && (
-            <ConceptDetail
-              node={selectedNode || (multiSelectIds.size > 0 ? data!.nodes.find((n) => multiSelectIds.has(n.id))! : null)!}
-              researchers={data!.researchers}
-              allNodes={data!.nodes}
-              onClose={() => { setSelectedNodeId(null); setMultiSelectIds(new Set()); }}
-              onSelectNode={handleSelectNode}
-              multiSelectedNodes={data!.nodes.filter((n) => multiSelectIds.has(n.id))}
-              onDeselectNode={(id) => {
-                setMultiSelectIds((prev) => {
-                  const next = new Set(prev);
-                  next.delete(id);
-                  return next;
-                });
-              }}
-            />
+            <div className="map-float-detail">
+              <ConceptDetail
+                node={selectedNode || (multiSelectIds.size > 0 ? data!.nodes.find((n) => multiSelectIds.has(n.id))! : null)!}
+                researchers={data!.researchers}
+                allNodes={data!.nodes}
+                onClose={() => { setSelectedNodeId(null); setMultiSelectIds(new Set()); }}
+                onSelectNode={handleSelectNode}
+                multiSelectedNodes={data!.nodes.filter((n) => multiSelectIds.has(n.id))}
+                onDeselectNode={(id) => {
+                  setMultiSelectIds((prev) => {
+                    const next = new Set(prev);
+                    next.delete(id);
+                    return next;
+                  });
+                }}
+              />
+            </div>
           )}
+
+          {/* Floating cluster detail */}
           {selectedCluster && (
-            <ClusterDetail
-              cluster={selectedCluster}
-              nodes={data!.nodes}
-              researchers={data!.researchers}
-              onClose={() => setSelectedClusterId(null)}
-              onSelectNode={handleSelectNode}
-            />
+            <div className="map-float-detail">
+              <ClusterDetail
+                cluster={selectedCluster}
+                nodes={data!.nodes}
+                researchers={data!.researchers}
+                onClose={() => setSelectedClusterId(null)}
+                onSelectNode={handleSelectNode}
+              />
+            </div>
           )}
           {multiSelectIds.size > 0 && (
             <div className="map-selection-bar">
