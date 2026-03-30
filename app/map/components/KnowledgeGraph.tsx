@@ -97,34 +97,8 @@ export default function KnowledgeGraph({
     for (const n of nodes) nodePos.set(n.id, { x: xScale(n.x), y: yScale(n.y) });
     for (const h of hubs) nodePos.set(h.id, { x: xScale(h.x), y: yScale(h.y) });
 
-    // ── Optional: K-means cluster regions (toggled via toolbar) ──
-    const clusterOverlay = g.append("g").attr("class", "cluster-overlay");
-    if (showClusters) {
-      for (const c of clusterData) {
-        if (c.sp.length < 3) continue;
-        const hull = d3.polygonHull(c.sp);
-        if (!hull) continue;
-        const expanded = hull.map(([x, y]) => {
-          const dx = x - c.cx, dy = y - c.cy;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          return [x + (dx / (dist || 1)) * 40, y + (dy / (dist || 1)) * 40] as [number, number];
-        });
-        const line = d3.line().curve(d3.curveCatmullRomClosed.alpha(0.5));
-        clusterOverlay.append("path").attr("d", line(expanded))
-          .attr("fill", hexToRgba(c.color, 0.05))
-          .attr("stroke", hexToRgba(c.color, 0.2))
-          .attr("stroke-width", 1)
-          .attr("stroke-dasharray", "8,4");
-        // Cluster label
-        const topY = Math.min(...c.sp.map(p => p[1]));
-        clusterOverlay.append("text")
-          .attr("x", c.cx).attr("y", topY - 14)
-          .attr("text-anchor", "middle")
-          .attr("fill", hexToRgba(c.color, 0.7))
-          .attr("font-size", "12px").attr("font-weight", "700")
-          .text(c.label);
-      }
-    }
+    // Cluster overlay placeholder — rendered by separate effect
+    g.append("g").attr("class", "cluster-overlay");
 
     // ── Layer 2: Hub spoke edges ──
     const edgeGroup = g.append("g").attr("class", "hub-edges");
@@ -423,7 +397,7 @@ export default function KnowledgeGraph({
 
     applySemanticZoom(1);
     return () => { svg.selectAll("*").remove(); };
-  }, [data, hiddenResearchers, searchQuery, isNodeActive, onSelectNode, onSelectCluster, selectedClusterId, showClusters]);
+  }, [data, hiddenResearchers, searchQuery, isNodeActive, onSelectNode, onSelectCluster, selectedClusterId]);
 
   // Selection highlight
   useEffect(() => {
@@ -471,6 +445,49 @@ export default function KnowledgeGraph({
       svg.selectAll(".graph-node-glow").attr("stroke-width", 0).attr("opacity", 0);
     }
   }, [selectedNodeId, multiSelectIds, data.nodes, searchQuery]);
+
+  // K-means cluster overlay — separate effect so toggling doesn't re-render the whole canvas
+  useEffect(() => {
+    if (!svgRef.current) return;
+    const svg = d3.select(svgRef.current);
+    const overlay = svg.select(".cluster-overlay");
+    overlay.selectAll("*").remove();
+
+    if (!showClusters) return;
+
+    const width = svgRef.current.clientWidth;
+    const height = svgRef.current.clientHeight;
+    const xScale = d3.scaleLinear().domain([0, 1000]).range([80, width - 80]);
+    const yScale = d3.scaleLinear().domain([0, 1000]).range([80, height - 80]);
+
+    for (const cluster of data.clusters) {
+      const color = CLUSTER_COLORS[cluster.id % CLUSTER_COLORS.length];
+      const sp: [number, number][] = cluster.points.map(([x, y]) => [xScale(x), yScale(y)]);
+      if (sp.length < 3) continue;
+      const hull = d3.polygonHull(sp);
+      if (!hull) continue;
+      const cx = xScale(cluster.centroidX);
+      const cy = yScale(cluster.centroidY);
+      const expanded = hull.map(([x, y]) => {
+        const dx = x - cx, dy = y - cy;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        return [x + (dx / (dist || 1)) * 40, y + (dy / (dist || 1)) * 40] as [number, number];
+      });
+      const line = d3.line().curve(d3.curveCatmullRomClosed.alpha(0.5));
+      overlay.append("path").attr("d", line(expanded))
+        .attr("fill", hexToRgba(color, 0.05))
+        .attr("stroke", hexToRgba(color, 0.2))
+        .attr("stroke-width", 1)
+        .attr("stroke-dasharray", "8,4");
+      const topY = Math.min(...sp.map(p => p[1]));
+      overlay.append("text")
+        .attr("x", cx).attr("y", topY - 14)
+        .attr("text-anchor", "middle")
+        .attr("fill", hexToRgba(color, 0.7))
+        .attr("font-size", "12px").attr("font-weight", "700")
+        .text(cluster.label);
+    }
+  }, [showClusters, data.clusters]);
 
   return (
     <div className="map-canvas">
