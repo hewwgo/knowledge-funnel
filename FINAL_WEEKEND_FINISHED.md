@@ -1,101 +1,134 @@
 # Final Weekend — Completed Work
 
-## Summary
-All P0 and P1 items from supervisor feedback addressed. System is end-to-end functional across three layers: Capture Layer → Mapping Layer → Composition Layer.
+## This Session Summary
 
-**Layer naming** (mosaic metaphor):
+Major visual and interaction overhaul of the Mapping Layer, plus Composition Layer refinements. The knowledge map went from a basic scatter plot to a proper interactive knowledge graph with concept hub nodes, document-shaped icons, semantic zoom across three levels, and a floating toolbar. The Composition Layer got divergent pitch tone, backfilling, and the reconnect loop. Layer naming finalized around the mosaic metaphor.
+
+**Key achievements this session:**
+- Knowledge map completely redesigned — concept hubs as primary structure, document icons, 3-level semantic zoom
+- Floating centered toolbar with search, researcher filter, k-means toggle
+- Composition Layer pitches rewritten for true divergence (not formulaic)
+- Backfilling after lock-in, save-to-funnel loop
+- Concept distinctiveness (TF-IDF intuition) merged into single inline view
+- Layer naming: Capture → Mapping → Composition
+
+---
+
+## Layer Naming (mosaic metaphor)
 - **Capture Layer** — ingestion via Discord bot
 - **Mapping Layer** (was "extraction layer") — embedding, UMAP, clustering, knowledge map visualization
 - **Composition Layer** (was "generation layer") — faceted ideation engine, seed selection, progressive domain sculpting
 
 ---
 
-## 1. Knowledge Map Redesign (P0)
-- **Card nodes**: submissions render as titled cards (background tint = researcher color) that collapse to dots when zoomed out
-- Gaussian-blurred soft cluster blobs with crisp subtle outline (replaced dashed convex polygons)
-- Nearest-neighbor edges within clusters showing internal semantic structure
-- Cluster labels: 13px bold, positioned at hull top
-- Per-cluster pastel fill colors (Okabe-Ito derived, 8 distinct colors)
-- Progressive semantic zoom: zoomed out shows cluster labels only → zoom in reveals node titles → further zoom shows submitter names
-- Hover glow effect with node scale-up animation
-- Drop shadows on nodes for depth
-- Search with match count ("5 of 30 matching"), X to clear, glow highlights on matching nodes
-- Papers distinguished by thin type ring around node
-- Better tooltip with backdrop blur, structured layout, interaction hints
-- Cluster labels repositioned to hull top, uppercase styling
-- Instructions panel in sidebar
-- Click background to deselect
+## Mapping Layer — Complete Redesign
 
-## 2. Backfilling in Generation (P0)
-- After locking a facet and filtering out non-matching ideas, the system auto-generates replacement ideas to maintain the target count
-- New ideas satisfy all current constraints (seeds + all locked facets)
-- New ideas are classified into existing facets before display
-- Keeps the idea space populated as the user converges
+### Concept Hub Network
+- Shared concepts (3+ submissions) become grey circle hub nodes positioned at centroid of member submissions
+- Hub-to-submission spoke edges show why papers cluster together
+- Hubs are clickable: click to highlight connected nodes + edges, click again to deselect
+- Hub labels scale with zoom (more text revealed as you zoom in, 16→40 chars)
+- Hub circles: 2px stroke at 35% opacity, solid black text — prominent landmarks
 
-## 3. LLM-level TF-IDF (P0)
-- Concept frequency computed across the entire corpus
-- Concepts appearing in <30% of submissions marked as "distinctive" for that article
-- Detail panel shows "What Makes This Distinctive" section with orange-highlighted rare concepts
-- Separate from general concepts list — helps researchers understand each submission's unique contribution
+### Document-Shaped Nodes
+- Papers/links: small portrait page icon (22x28px) with folded corner + faux text lines inside
+- Notes/ideas: rounded sticky note shape with color tint + dashed border
+- Title text positioned ABOVE the icon, submitter name BELOW
+- Title length scales with zoom: ~30 chars at 1.5x, up to 80 chars at high zoom
+- Font size scales inversely (bigger text when zoomed in)
+- Submitter names appear at zoom 1.8x
 
-## 4. Reconnect — Save Ideas to Funnel (P0)
+### 3-Level Semantic Zoom
+- **Overview (k < 0.65)**: Concept hubs bold as landmarks, no submission nodes visible
+- **Mid zoom (0.65–1.5)**: Colored dots for submissions, hub spoke edges visible, hubs at normal weight
+- **Detail zoom (1.5+)**: Document icons replace dots, titles + submitter names visible
+
+### K-Means Clusters
+- Removed k-means colored blobs and labels from default view
+- K-means available as optional toggle ("Toggle k-means clusters" in toolbar)
+- When toggled on: dashed colored hull outlines + cluster labels appear as overlay
+- Toggling does NOT reset concept hub highlights or zoom position
+- K-means still powers the pipeline (spatial grouping), concept hubs provide the visible structure
+
+### Floating Toolbar
+- Centered at top of canvas with glass-morphism background
+- Single row: Tessera brand → stats (submissions, authors, clusters) → search → Researchers dropdown → Toggle k-means → Recompute
+- Search expands on focus
+- Researcher filter as persistent dropdown (stays open while toggling)
+- Detached from page chrome — floats over the map
+
+### Concept Distinctiveness (TF-IDF Intuition)
+- Merged distinctive and regular concepts into one inline view
+- Rare concepts highlighted orange, common ones in grey
+- Small annotation: "Orange = rare in corpus (distinctive to this submission)"
+- Follows TF-IDF intuition at concept level rather than term level
+
+### Other Map Improvements
+- Full-screen canvas — no sidebar borders cutting into the map
+- Detail panel floats top-right with glass background (340px wide, no horizontal scroll)
+- Hub spoke edges subtle (0.08 opacity) to avoid visual clutter
+- Click background to deselect all
+- Landing page redirects to /map
+
+---
+
+## Composition Layer Improvements
+
+### Pitch Tone — True Divergence
+- System prompt completely rewritten as "creative research provocateur"
+- Seeds framed as springboards, not boundaries ("go BEYOND these")
+- Every description starts differently (questions, provocations, scenarios, proposals)
+- No more formulaic "A promising direction..." openings
+- Grounding must state the specific leap taken from each seed
+
+### Double Diamond Workflow
+- Orange seeds (from map) = DIVERGE (creative inspiration)
+- Green locked facets = CONVERGE (hard constraints)
+- System diverges with idea generation + facet discovery
+- User converges by locking dimensions
+- System diverges again with backfilling + new facet
+- Repeat: progressively refining the idea space
+
+### Backfilling
+- After locking a facet filters out ideas, system auto-generates replacements
+- New ideas satisfy all current constraints (seeds + locked facets)
+- New ideas classified into existing facets before display
+- Maintains target idea count through the converge/diverge cycle
+
+### Reconnect — Save to Funnel
 - "Save to Funnel" button in idea detail panel
-- Creates a new submission of type `idea` in Supabase with:
-  - Title and description from the generated idea
-  - Grounding provenance (which seeds shaped it and how)
-  - Facet path (the locked dimensions that led to this idea)
-- Saved ideas appear on the knowledge map after next recompute
-- Closes the generation → capture loop
+- Creates submission of type 'idea' with title, description, grounding, facet path
+- Saved ideas appear on knowledge map after next recompute
+- Closes the composition → capture loop
 
-## 5. Fuller Extraction (P1)
-- Bumped text truncation from 4K to 8K characters across all extraction points:
-  - `lib/concepts.ts` (concept tagging)
-  - `lib/embeddings.ts` (tag generation)
-  - `discord-bot/shared.ts` (bot-side concept extraction + embedding)
-- More of each document's content is analyzed for semantic embedding and concept tagging
+### Layout
+- Detail panel below facet columns (not right sidebar)
+- Seeds collapsible, everything centered (max-width 1100px)
+- Facet columns shrink when detail panel open
 
-## 6. Person-Article Relationship (P1)
-- Detail panel now shows "Other by [Name]" section
-- Lists up to 5 other submissions by the same researcher
-- Click-to-navigate between a person's submissions
-- Shows how articles relate to a person's broader research trajectory
+### Other
+- Empty facet values hidden (no empty buckets)
+- Duplicate title deduplication
+- Title stored with full text, displayed progressively
 
 ---
 
 ## Previously Completed (earlier sessions)
 
 ### Capture Layer
-- Discord bot live on Railway (24/7)
-- Slash commands: `/submit-link`, `/submit-note`, PDF auto-detection
-- Works in channel + DMs
-- Auto-creates profiles from Discord usernames
+- Discord bot on Railway (24/7): /submit-link, /submit-note, PDF auto-detection
+- Works in channel + DMs, auto-creates profiles
 - Duplicate URL detection (same person rejected, different person allowed)
-- Prompt injection defense in all LLM extraction prompts
 - Knowledge Base Q&A via @mention / DM
-- System prompt: no website links, clear usage walkthrough, cross-referencing submissions
+- Prompt injection defense
 
-### Extraction Layer
-- Semantic embedding via Voyage AI (`voyage-3-lite`, 1024-dim)
+### Extraction Pipeline
+- Semantic embedding via Voyage AI (voyage-3-lite, 1024-dim, 8K char input)
 - Concept tagging via DeepSeek (1 broad + 1-2 specific, reuses existing labels)
-- UMAP dimensionality reduction (1024-dim → 2D, preserves semantic distances)
-- K-means clustering (replaced DBSCAN — always assigns every point to a cluster)
-- Cluster auto-labeling via DeepSeek (2-4 word thematic labels)
-- All extraction runs automatically on each Discord submission (fire-and-forget)
-- Projection results cached in `projection_cache` for instant map loading
-
-### Generation Layer
-- Idea Explorer (`/explore`) with faceted search engine
-- Seeds loaded from knowledge map via Shift+click multi-select
-- Each seed provides title + first 300 chars of body as LLM context
-- Explicit diverge/converge separation in prompts:
-  - Orange seeds (from map) = diverge (creative inspiration)
-  - Green locked facets = converge (hard constraints)
-- Facet discovery: LLM infers 4-5 categorical/ordinal dimensions
-- Classification: each idea assigned to 1+ values per facet
-- Progressive domain sculpting: lock → filter → new facet discovered → backfill
-- Grounding/provenance: each idea explicitly references which seeds shaped it
-- Duplicate title deduplication
-- Save to Funnel closes the loop
+- UMAP projection (1024-dim → 2D)
+- K-means clustering (k scales with dataset size)
+- Cluster auto-labeling via DeepSeek
+- All extraction runs automatically on each Discord submission
 
 ### Infrastructure
 - Web app: Next.js 16 on Vercel
@@ -104,41 +137,3 @@ All P0 and P1 items from supervisor feedback addressed. System is end-to-end fun
 - Storage: Supabase Storage (PDFs)
 - LLMs: DeepSeek (extraction, labeling, generation) + Voyage AI (embeddings)
 - D3.js for map visualization
-
----
-
-## Latest Session Additions
-
-### Knowledge Map → Card Nodes with Semantic Zoom
-- Nodes are titled cards with researcher color background tint
-- Cards collapse to colored dots when zoomed out (threshold: zoom < 2x)
-- Submitter names appear at higher zoom (> 2.5x)
-- Smooth transition between card and dot modes
-
-### Soft Cluster Regions
-- Gaussian-blurred background blobs replace dashed convex hulls
-- Soft organic feel with crisp subtle outline on top
-- Per-cluster colors from colorblind-safe palette
-
-### Nearest-Neighbor Edges
-- Faint connecting lines between nearest neighbors within each cluster
-- Shows internal semantic structure (which papers are closest to each other)
-- Visible only when zoomed in (> 1.2x) to avoid clutter at overview level
-
-### Composition Layer Layout Redesign
-- Pitch detail panel rendered below facet columns (was: right sidebar)
-- Seeds are collapsible (click to expand/collapse)
-- Everything centered with max-width 1100px for focused tool area
-- Facet columns shrink when detail panel is open (35vh) for screen efficiency
-- Renamed: "Idea Explorer" → "Composition" in header
-- Selection bar on map: "Explore Ideas" → "Compose"
-
-### Pitch Tone
-- Generation prompt updated to use suggestive language
-- Ideas framed as "directions worth exploring" not finished projects
-- Titles styled as concept names, not paper titles
-
-### Merge Distinctive + Regular Concepts
-- "What Makes This Distinctive" shows rare concepts (orange highlight)
-- Regular "Concepts" section shows all concepts
-- Both visible in submission detail panel on knowledge map

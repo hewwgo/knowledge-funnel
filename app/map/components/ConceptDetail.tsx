@@ -67,49 +67,35 @@ export default function ConceptDetail({
           </div>
         )}
 
-        {/* Distinctive concepts (TF-IDF) */}
-        {node.distinctiveConcepts && node.distinctiveConcepts.length > 0 && (
-          <div className="map-detail-neighbors">
-            <h4 className="map-detail-section-title">What Makes This Distinctive</h4>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-              {node.distinctiveConcepts.map((c) => (
-                <span
-                  key={c}
-                  style={{
-                    background: "rgba(213, 94, 0, 0.08)",
-                    border: "1px solid rgba(213, 94, 0, 0.2)",
-                    padding: "3px 8px",
-                    fontSize: "11px",
-                    fontWeight: 600,
-                    color: "#D55E00",
-                  }}
-                >
-                  {c}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* All concepts/tags */}
+        {/* Concepts — distinctive ones highlighted inline */}
         {node.concepts.length > 0 && (
           <div className="map-detail-neighbors">
             <h4 className="map-detail-section-title">Concepts</h4>
             <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-              {node.concepts.map((c) => (
-                <span
-                  key={c}
-                  style={{
-                    background: "rgba(38, 38, 36, 0.08)",
-                    padding: "3px 8px",
-                    fontSize: "11px",
-                    fontWeight: 500,
-                  }}
-                >
-                  {c}
-                </span>
-              ))}
+              {node.concepts.map((c) => {
+                const isDistinctive = node.distinctiveConcepts?.includes(c);
+                return (
+                  <span
+                    key={c}
+                    style={{
+                      background: isDistinctive ? "rgba(213, 94, 0, 0.08)" : "rgba(38, 38, 36, 0.06)",
+                      border: isDistinctive ? "1px solid rgba(213, 94, 0, 0.25)" : "1px solid rgba(38, 38, 36, 0.1)",
+                      padding: "3px 8px",
+                      fontSize: "11px",
+                      fontWeight: isDistinctive ? 600 : 400,
+                      color: isDistinctive ? "#D55E00" : "#262624",
+                    }}
+                  >
+                    {c}
+                  </span>
+                );
+              })}
             </div>
+            {node.distinctiveConcepts && node.distinctiveConcepts.length > 0 && (
+              <p style={{ fontSize: 9, color: "rgba(38,38,36,0.4)", marginTop: 6 }}>
+                Orange = rare in corpus (distinctive to this submission)
+              </p>
+            )}
           </div>
         )}
 
