@@ -301,17 +301,15 @@ export default function KnowledgeGraph({
       }
     });
 
-    // Title text ABOVE the document icon
+    // Title text ABOVE the document icon — full title stored, truncation handled by zoom
     node.append("text").attr("class", "graph-card-title")
       .attr("x", 0).attr("y", -DOC_H / 2 - 5)
       .attr("text-anchor", "middle")
       .attr("fill", "#262624")
       .attr("font-size", "7.5px").attr("font-weight", "500")
       .attr("opacity", 0)
-      .text((d) => {
-        const t = cleanTitle(d.title);
-        return t.length > 24 ? t.slice(0, 22) + "…" : t;
-      });
+      .attr("data-full-title", (d) => cleanTitle(d.title))
+      .text((d) => cleanTitle(d.title)); // full title, zoom adjusts font size
 
     // Submitter below the icon
     node.append("text").attr("class", "graph-card-submitter")
@@ -360,8 +358,12 @@ export default function KnowledgeGraph({
         if (DETAIL) {
           el.selectAll(".graph-card, .graph-card-fold").attr("opacity", 1);
           el.select(".graph-card-title").attr("opacity", 1);
-          el.select(".graph-card-submitter").attr("opacity", k > 2 ? 1 : 0);
+          el.select(".graph-card-submitter").attr("opacity", k > 2.5 ? 1 : 0);
           el.select(".graph-node").attr("opacity", 0);
+          // Scale title font inversely — bigger text at higher zoom so it reads well
+          const fontSize = Math.max(5, Math.min(9, 11 / k));
+          el.select(".graph-card-title").attr("font-size", `${fontSize}px`);
+          el.select(".graph-card-submitter").attr("font-size", `${Math.max(4, fontSize - 1.5)}px`);
         } else {
           el.selectAll(".graph-card, .graph-card-fold").attr("opacity", 0);
           el.select(".graph-card-title").attr("opacity", 0);
