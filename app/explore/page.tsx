@@ -143,8 +143,9 @@ async function discoverFacets(
   const avoidClause = existingFacetNames.length
     ? `Avoid these existing facet names: ${existingFacetNames.join(", ")}.`
     : "";
+  const maxValues = Math.min(6, Math.max(3, Math.ceil(ideas.length / 2)));
   const prompt = `Given these research ideas:\n${summaries}\n\nPropose 4 to 5 facets (dimensions) that meaningfully characterize and contrast them. ${avoidClause}
-Each facet should have 3 to 8 values. Facets can be ordinal or categorical.
+Each facet should have 3 to ${maxValues} values. Keep values broad enough that multiple ideas can share a value — avoid creating a unique value for every idea. Facets can be ordinal or categorical.
 Return a JSON array: [{"name": "Facet Name", "type": "categorical"|"ordinal", "values": ["Value1","Value2",...]}]
 Only JSON.`;
   const raw = await callLLM(sys, prompt);
@@ -167,7 +168,7 @@ async function discoverSingleFacet(
   const avoidClause = `You MUST avoid these existing and previously used facet names: ${allAvoid.join(", ")}. Generate a completely different dimension that reveals a new aspect of these ideas.`;
   const prompt = `Given these research ideas:\n${summaries}\n\n${avoidClause}
 Propose exactly 1 NEW facet (dimension) that meaningfully characterizes and contrasts these ideas along an axis not yet covered.
-The facet should have 3 to 8 values and can be ordinal or categorical.
+The facet should have 3 to ${Math.min(5, Math.max(3, Math.ceil(ideas.length / 2)))} values. Keep values broad so multiple ideas share values. Can be ordinal or categorical.
 Return a JSON array with exactly 1 element: [{"name": "Facet Name", "type": "categorical"|"ordinal", "values": ["Value1","Value2",...]}]`;
   const raw = await callLLM(sys, prompt);
   try {
