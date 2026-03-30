@@ -261,7 +261,7 @@ export default function MapPage() {
               fontSize: 10,
             }}
           >
-            Toggle k-means
+            Toggle k-means clusters
           </button>
         </div>
         <div className="map-toolbar-right">
