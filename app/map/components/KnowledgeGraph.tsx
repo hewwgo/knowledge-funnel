@@ -139,7 +139,8 @@ export default function KnowledgeGraph({
       .attr("font-size", "11px").attr("font-weight", "700")
       .attr("class", "hub-inner-label")
       .attr("pointer-events", "none")
-      .text((d) => d.label.length > 20 ? d.label.slice(0, 18) + "…" : d.label);
+      .attr("data-full-label", (d) => d.label)
+      .text((d) => d.label);
 
     // Hub hover + click
     hubNode
@@ -324,9 +325,15 @@ export default function KnowledgeGraph({
         .attr("fill", OVERVIEW ? "rgba(38,38,36,0.06)" : "rgba(38,38,36,0.03)")
         .attr("stroke", OVERVIEW ? "rgba(38,38,36,0.3)" : "rgba(38,38,36,0.15)")
         .attr("stroke-width", OVERVIEW ? 1.5 : 1);
-      hubNode.selectAll<SVGTextElement, unknown>(".hub-inner-label")
-        .attr("font-size", OVERVIEW ? "13px" : `${Math.max(7, Math.min(11, 9 / k))}px`)
-        .attr("fill", OVERVIEW ? "rgba(38,38,36,0.75)" : "rgba(38,38,36,0.6)");
+      hubNode.selectAll<SVGTextElement, unknown>(".hub-inner-label").each(function () {
+        const el = d3.select(this);
+        const fullLabel = el.attr("data-full-label") || "";
+        const fontSize = OVERVIEW ? 13 : Math.max(7, Math.min(12, 10 / k));
+        const maxChars = OVERVIEW ? 16 : Math.min(40, Math.floor(14 + k * 8));
+        el.attr("font-size", `${fontSize}px`)
+          .attr("fill", OVERVIEW ? "rgba(38,38,36,0.75)" : "#262624")
+          .text(fullLabel.length > maxChars ? fullLabel.slice(0, maxChars - 1) + "…" : fullLabel);
+      });
 
       // Submission nodes
       node.each(function (d) {
