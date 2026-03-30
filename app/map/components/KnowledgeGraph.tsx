@@ -14,6 +14,7 @@ interface Props {
   selectedClusterId: number | null;
   multiSelectIds: Set<string>;
   onToggleMultiSelect: (id: string) => void;
+  showClusters: boolean;
 }
 
 const CLUSTER_COLORS = [
@@ -40,7 +41,7 @@ export default function KnowledgeGraph({
   data, hiddenResearchers, searchQuery,
   onSelectNode, selectedNodeId,
   onSelectCluster, selectedClusterId,
-  multiSelectIds, onToggleMultiSelect,
+  multiSelectIds, onToggleMultiSelect, showClusters,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
@@ -96,8 +97,34 @@ export default function KnowledgeGraph({
     for (const n of nodes) nodePos.set(n.id, { x: xScale(n.x), y: yScale(n.y) });
     for (const h of hubs) nodePos.set(h.id, { x: xScale(h.x), y: yScale(h.y) });
 
-    // K-means labels removed from canvas — concept hubs are the primary structure.
-    // K-means still used for mega-dots (overview) and cluster detail panel.
+    // ── Optional: K-means cluster regions (toggled via toolbar) ──
+    const clusterOverlay = g.append("g").attr("class", "cluster-overlay");
+    if (showClusters) {
+      for (const c of clusterData) {
+        if (c.sp.length < 3) continue;
+        const hull = d3.polygonHull(c.sp);
+        if (!hull) continue;
+        const expanded = hull.map(([x, y]) => {
+          const dx = x - c.cx, dy = y - c.cy;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          return [x + (dx / (dist || 1)) * 40, y + (dy / (dist || 1)) * 40] as [number, number];
+        });
+        const line = d3.line().curve(d3.curveCatmullRomClosed.alpha(0.5));
+        clusterOverlay.append("path").attr("d", line(expanded))
+          .attr("fill", hexToRgba(c.color, 0.05))
+          .attr("stroke", hexToRgba(c.color, 0.2))
+          .attr("stroke-width", 1)
+          .attr("stroke-dasharray", "8,4");
+        // Cluster label
+        const topY = Math.min(...c.sp.map(p => p[1]));
+        clusterOverlay.append("text")
+          .attr("x", c.cx).attr("y", topY - 14)
+          .attr("text-anchor", "middle")
+          .attr("fill", hexToRgba(c.color, 0.7))
+          .attr("font-size", "12px").attr("font-weight", "700")
+          .text(c.label);
+      }
+    }
 
     // ── Layer 2: Hub spoke edges ──
     const edgeGroup = g.append("g").attr("class", "hub-edges");
@@ -133,12 +160,12 @@ export default function KnowledgeGraph({
       .attr("cursor", "pointer");
 
     hubNode.append("text")
-      .attr("text-anchor", "middle").attr("dy", 3)
-      .attr("fill", "rgba(38,38,36,0.5)")
-      .attr("font-size", "8px").attr("font-weight", "600")
+      .attr("text-anchor", "middle").attr("dy", 4)
+      .attr("fill", "rgba(38,38,36,0.6)")
+      .attr("font-size", "10px").attr("font-weight", "700")
       .attr("class", "hub-inner-label")
       .attr("pointer-events", "none")
-      .text((d) => d.label.length > 18 ? d.label.slice(0, 16) + "…" : d.label);
+      .text((d) => d.label.length > 20 ? d.label.slice(0, 18) + "…" : d.label);
 
     // Hub hover + click
     hubNode
@@ -165,14 +192,31 @@ export default function KnowledgeGraph({
       })
       .on("click", (event, d) => {
         event.stopPropagation();
-        // Find the cluster that contains most hub members and select it
-        const hubMemberIds = hubEdges
-          .filter(e => e.from === d.id)
-          .map(e => e.to);
-        if (hubMemberIds.length > 0) {
-          // Select the first member node to show detail
-          onSelectNode(hubMemberIds[0]);
-        }
+        const hubMemberIds = new Set(
+          hubEdges.filter(e => e.from === d.id).map(e => e.to)
+        );
+
+        // Highlight connected edges
+        edgeGroup.selectAll<SVGLineElement, unknown>(".hub-edge").each(function () {
+          const line = d3.select(this);
+          const x1 = +line.attr("x1"), y1 = +line.attr("y1");
+          const hubX = xScale(d.x), hubY = yScale(d.y);
+          const isConnected = Math.abs(x1 - hubX) < 1 && Math.abs(y1 - hubY) < 1;
+          line
+            .attr("stroke", isConnected ? hexToRgba(CLUSTER_COLORS[0], 0.5) : "rgba(38,38,36,0.08)")
+            .attr("stroke-width", isConnected ? 1.5 : 0.6);
+        });
+
+        // Highlight connected nodes
+        node.each(function (n) {
+          const el = d3.select(this);
+          if (hubMemberIds.has(n.id)) {
+            el.select(".graph-node")
+              .transition().duration(150)
+              .attr("r", NODE_R + 3)
+              .attr("stroke", "#262624").attr("stroke-width", 2);
+          }
+        });
       });
 
     // ── Layer 4: Mega-dots (overview only) ──
@@ -198,9 +242,9 @@ export default function KnowledgeGraph({
     // ── Layer 5: Submission nodes ──
     const nodeGroup = g.append("g").attr("class", "nodes");
     const NODE_R = 5;
-    const CARD_W = 120;
-    const CARD_H = 22;
-    const FOLD = 6; // corner fold size for papers
+    const CARD_W = 170;
+    const CARD_H = 32;
+    const FOLD = 8;
 
     const node = nodeGroup.selectAll<SVGGElement, MapNode>("g")
       .data(nodes).join("g")
@@ -209,53 +253,63 @@ export default function KnowledgeGraph({
       .attr("cursor", "pointer")
       .attr("opacity", 0);
 
-    // Document-shaped card (paper = folded corner, note = rounded)
+    // Document-shaped card
     node.each(function (d) {
       const el = d3.select(this);
       const isPaper = d.contentType === "paper" || d.contentType === "link";
       const x = -CARD_W / 2, y = -CARD_H / 2;
 
       if (isPaper) {
-        // Document with folded corner
+        // Paper: white card with folded corner + shadow
         el.append("path")
           .attr("class", "graph-card")
           .attr("d", `M${x},${y} L${x + CARD_W - FOLD},${y} L${x + CARD_W},${y + FOLD} L${x + CARD_W},${y + CARD_H} L${x},${y + CARD_H} Z`)
           .attr("fill", "#ffffff")
-          .attr("stroke", hexToRgba(d.submitterColor, 0.3))
-          .attr("stroke-width", 0.8)
+          .attr("stroke", hexToRgba(d.submitterColor, 0.35))
+          .attr("stroke-width", 1)
+          .attr("filter", "drop-shadow(0 1px 3px rgba(0,0,0,0.08))")
           .attr("opacity", 0);
-        // Fold triangle
+        // Fold
         el.append("path")
           .attr("class", "graph-card-fold")
           .attr("d", `M${x + CARD_W - FOLD},${y} L${x + CARD_W - FOLD},${y + FOLD} L${x + CARD_W},${y + FOLD}`)
-          .attr("fill", hexToRgba(d.submitterColor, 0.1))
-          .attr("stroke", hexToRgba(d.submitterColor, 0.2))
+          .attr("fill", hexToRgba(d.submitterColor, 0.15))
+          .attr("stroke", hexToRgba(d.submitterColor, 0.25))
           .attr("stroke-width", 0.5)
           .attr("opacity", 0);
       } else {
-        // Note/idea — rounded rect
+        // Note/idea: tinted rounded card with dashed border
         el.append("rect")
           .attr("class", "graph-card")
           .attr("x", x).attr("y", y)
           .attr("width", CARD_W).attr("height", CARD_H)
-          .attr("rx", 4)
-          .attr("fill", hexToRgba(d.submitterColor, 0.06))
-          .attr("stroke", hexToRgba(d.submitterColor, 0.25))
-          .attr("stroke-width", 0.8)
+          .attr("rx", 6)
+          .attr("fill", hexToRgba(d.submitterColor, 0.08))
+          .attr("stroke", hexToRgba(d.submitterColor, 0.3))
+          .attr("stroke-width", 1)
+          .attr("stroke-dasharray", "4,2")
           .attr("opacity", 0);
       }
     });
 
-    // Card title
+    // Card title — readable size
     node.append("text").attr("class", "graph-card-title")
-      .attr("x", -CARD_W / 2 + 6).attr("y", 2)
+      .attr("x", -CARD_W / 2 + 8).attr("y", -2)
       .attr("fill", "#262624")
-      .attr("font-size", "7px").attr("font-weight", "500")
+      .attr("font-size", "9px").attr("font-weight", "600")
       .attr("opacity", 0)
       .text((d) => {
         const t = cleanTitle(d.title);
-        return t.length > 22 ? t.slice(0, 20) + "…" : t;
+        return t.length > 30 ? t.slice(0, 28) + "…" : t;
       });
+
+    // Card submitter name
+    node.append("text").attr("class", "graph-card-submitter")
+      .attr("x", -CARD_W / 2 + 8).attr("y", 11)
+      .attr("fill", "rgba(38,38,36,0.4)")
+      .attr("font-size", "7.5px")
+      .attr("opacity", 0)
+      .text((d) => d.submitterName);
 
     // Dot (visible when not at card zoom)
     node.append("circle").attr("r", NODE_R)
@@ -295,10 +349,12 @@ export default function KnowledgeGraph({
         if (DETAIL) {
           el.selectAll(".graph-card, .graph-card-fold").attr("opacity", 1);
           el.select(".graph-card-title").attr("opacity", 1);
+          el.select(".graph-card-submitter").attr("opacity", k > 2 ? 1 : 0);
           el.select(".graph-node").attr("opacity", 0);
         } else {
           el.selectAll(".graph-card, .graph-card-fold").attr("opacity", 0);
           el.select(".graph-card-title").attr("opacity", 0);
+          el.select(".graph-card-submitter").attr("opacity", 0);
           el.select(".graph-node").attr("opacity", 1);
         }
       });
@@ -341,7 +397,7 @@ export default function KnowledgeGraph({
 
     applySemanticZoom(1);
     return () => { svg.selectAll("*").remove(); };
-  }, [data, hiddenResearchers, searchQuery, isNodeActive, onSelectNode, onSelectCluster, selectedClusterId]);
+  }, [data, hiddenResearchers, searchQuery, isNodeActive, onSelectNode, onSelectCluster, selectedClusterId, showClusters]);
 
   // Selection highlight
   useEffect(() => {

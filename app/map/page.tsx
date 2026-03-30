@@ -75,6 +75,7 @@ export default function MapPage() {
   const [computeProgress, setComputeProgress] = useState("");
   const [multiSelectIds, setMultiSelectIds] = useState<Set<string>>(new Set());
   const [filterOpen, setFilterOpen] = useState(false);
+  const [showClusters, setShowClusters] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -254,6 +255,16 @@ export default function MapPage() {
           </div>
         </div>
         <div className="map-toolbar-right">
+          <button
+            className="map-toolbar-dropdown-btn"
+            onClick={() => setShowClusters(!showClusters)}
+            style={{
+              background: showClusters ? "rgba(38,38,36,0.08)" : "transparent",
+              fontSize: 10,
+            }}
+          >
+            {showClusters ? "Hide" : "Show"} Clusters
+          </button>
           {computeProgress && (
             <span style={{ fontSize: "11px", color: "rgba(38,38,36,0.5)" }}>{computeProgress}</span>
           )}
@@ -296,6 +307,7 @@ export default function MapPage() {
             selectedClusterId={selectedClusterId}
             multiSelectIds={multiSelectIds}
             onToggleMultiSelect={handleToggleMultiSelect}
+            showClusters={showClusters}
           />
 
           {/* Floating detail panel — right side */}
