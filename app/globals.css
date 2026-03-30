@@ -689,75 +689,80 @@ body {
   overflow: hidden;
 }
 
-/* Toolbar */
+/* Floating toolbar */
 .map-toolbar {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 8px 16px;
-  border-bottom: 1px solid rgba(38, 38, 36, 0.1);
-  flex-shrink: 0;
-  gap: 16px;
-  background: #ffffff;
+  gap: 10px;
+  padding: 6px 14px;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(38, 38, 36, 0.1);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  white-space: nowrap;
 }
 
 .map-toolbar-left {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   flex-shrink: 0;
 }
 
 .map-toolbar-brand {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   color: #262624;
   letter-spacing: 0.02em;
 }
 
 .map-toolbar-stats {
-  font-size: 10px;
+  font-size: 9px;
   color: rgba(38, 38, 36, 0.4);
 }
 
 .map-toolbar-center {
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex: 1;
-  max-width: 650px;
+  gap: 6px;
 }
 
 .map-toolbar-search {
   position: relative;
-  flex: 1;
 }
 
 .map-toolbar-search input {
-  width: 100%;
-  padding: 5px 24px 5px 10px;
+  width: 180px;
+  padding: 4px 22px 4px 8px;
   border: 1px solid rgba(38, 38, 36, 0.15);
   font-size: 11px;
   font-family: "Inter", sans-serif;
   color: #262624;
-  background: rgba(38, 38, 36, 0.02);
+  background: transparent;
   outline: none;
 }
 
 .map-toolbar-search input:focus {
   border-color: rgba(38, 38, 36, 0.3);
+  width: 240px;
+  transition: width 0.2s ease;
 }
 
 .map-toolbar-search-clear {
   position: absolute;
-  right: 6px;
+  right: 5px;
   top: 50%;
   transform: translateY(-50%);
   background: none;
   border: none;
   color: rgba(38, 38, 36, 0.4);
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
   padding: 0;
   line-height: 1;
 }

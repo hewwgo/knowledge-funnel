@@ -193,91 +193,7 @@ export default function MapPage() {
   const selectedCluster = data?.clusters.find((c) => c.id === selectedClusterId) || null;
 
   return (
-    <div className="map-page">
-      {/* Toolbar */}
-      <header className="map-toolbar">
-        <div className="map-toolbar-left">
-          <h1 className="map-toolbar-brand">Tessera</h1>
-          {data && data.nodes.length > 0 && (
-            <span className="map-toolbar-stats">
-              {data.nodes.length} submissions &middot; {data.researchers.length} authors &middot; {data.clusters.length} clusters
-            </span>
-          )}
-        </div>
-        <div className="map-toolbar-center">
-          <div className="map-toolbar-search">
-            <input
-              type="text"
-              placeholder="Search titles, concepts..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-            {searchQuery && (
-              <button onClick={() => setSearchQuery("")} className="map-toolbar-search-clear">&times;</button>
-            )}
-          </div>
-          {/* Researcher filter dropdown */}
-          <div className="map-toolbar-dropdown" style={{ position: "relative" }}>
-            <button
-              className="map-toolbar-dropdown-btn"
-              onClick={() => setFilterOpen(!filterOpen)}
-            >
-              Researchers
-              {hiddenResearchers.size > 0 && (
-                <span style={{ marginLeft: 4, fontSize: 9, opacity: 0.5 }}>
-                  ({(data?.researchers.length || 0) - hiddenResearchers.size}/{data?.researchers.length})
-                </span>
-              )}
-              <span style={{ marginLeft: 4, fontSize: 8 }}>{filterOpen ? "▴" : "▾"}</span>
-            </button>
-            {filterOpen && (
-              <div className="map-toolbar-dropdown-menu"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {data?.researchers.map((r) => (
-                  <button
-                    key={r.id}
-                    className="map-toolbar-dropdown-item"
-                    onClick={() => toggleResearcher(r.id)}
-                    style={{ opacity: hiddenResearchers.has(r.id) ? 0.4 : 1 }}
-                  >
-                    <span style={{
-                      width: 10, height: 10, borderRadius: "50%",
-                      background: hiddenResearchers.has(r.id) ? "rgba(38,38,36,0.15)" : r.color,
-                      flexShrink: 0, border: `1px solid ${r.color}`,
-                    }} />
-                    <span style={{ flex: 1 }}>{r.name}</span>
-                    <span style={{ fontSize: 9, color: "rgba(38,38,36,0.4)" }}>{r.submissionCount}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          <button
-            className="map-toolbar-dropdown-btn"
-            onClick={() => setShowClusters(!showClusters)}
-            style={{
-              background: showClusters ? "rgba(38,38,36,0.08)" : "transparent",
-              fontSize: 10,
-            }}
-          >
-            Toggle k-means clusters
-          </button>
-        </div>
-        <div className="map-toolbar-right">
-          {computeProgress && (
-            <span style={{ fontSize: "11px", color: "rgba(38,38,36,0.5)" }}>{computeProgress}</span>
-          )}
-          <button
-            className="map-btn"
-            onClick={handleCompute}
-            disabled={computing}
-            style={{ padding: "5px 14px", fontSize: 10 }}
-          >
-            {computing ? "Computing..." : "Recompute"}
-          </button>
-        </div>
-      </header>
+    <div className="map-page" style={{ position: "relative" }}>
 
       {isEmpty ? (
         <div className="map-empty">
@@ -296,6 +212,68 @@ export default function MapPage() {
         </div>
       ) : (
         <div className="map-fullscreen" onClick={() => setFilterOpen(false)}>
+          {/* Floating toolbar */}
+          <div className="map-toolbar" onClick={(e) => e.stopPropagation()}>
+            <span className="map-toolbar-brand">Tessera</span>
+            {data && data.nodes.length > 0 && (
+              <span className="map-toolbar-stats">
+                {data.nodes.length} &middot; {data.researchers.length} authors &middot; {data.clusters.length} clusters
+              </span>
+            )}
+            <div className="map-toolbar-search">
+              <input
+                type="text"
+                placeholder="Search..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              {searchQuery && (
+                <button onClick={() => setSearchQuery("")} className="map-toolbar-search-clear">&times;</button>
+              )}
+            </div>
+            <div className="map-toolbar-dropdown" style={{ position: "relative" }}>
+              <button className="map-toolbar-dropdown-btn" onClick={() => setFilterOpen(!filterOpen)}>
+                Researchers
+                {hiddenResearchers.size > 0 && (
+                  <span style={{ marginLeft: 4, fontSize: 9, opacity: 0.5 }}>
+                    ({(data?.researchers.length || 0) - hiddenResearchers.size}/{data?.researchers.length})
+                  </span>
+                )}
+                <span style={{ marginLeft: 3, fontSize: 8 }}>{filterOpen ? "▴" : "▾"}</span>
+              </button>
+              {filterOpen && (
+                <div className="map-toolbar-dropdown-menu" onClick={(e) => e.stopPropagation()}>
+                  {data?.researchers.map((r) => (
+                    <button key={r.id} className="map-toolbar-dropdown-item"
+                      onClick={() => toggleResearcher(r.id)}
+                      style={{ opacity: hiddenResearchers.has(r.id) ? 0.4 : 1 }}>
+                      <span style={{ width: 10, height: 10, borderRadius: "50%",
+                        background: hiddenResearchers.has(r.id) ? "rgba(38,38,36,0.15)" : r.color,
+                        flexShrink: 0, border: `1px solid ${r.color}` }} />
+                      <span style={{ flex: 1 }}>{r.name}</span>
+                      <span style={{ fontSize: 9, color: "rgba(38,38,36,0.4)" }}>{r.submissionCount}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <button className="map-toolbar-dropdown-btn"
+              onClick={() => setShowClusters(!showClusters)}
+              style={{ background: showClusters ? "rgba(38,38,36,0.08)" : "transparent", fontSize: 10 }}>
+              Toggle k-means clusters
+            </button>
+            <button className="map-toolbar-dropdown-btn"
+              onClick={handleCompute} disabled={computing}
+              style={{ fontSize: 10 }}>
+              {computing ? "..." : "Recompute"}
+            </button>
+          </div>
+          {computeProgress && (
+            <div style={{ position: "absolute", top: 52, left: "50%", transform: "translateX(-50%)", zIndex: 20, fontSize: 10, color: "rgba(38,38,36,0.5)", background: "rgba(255,255,255,0.9)", padding: "2px 10px" }}>
+              {computeProgress}
+            </div>
+          )}
+
           {/* Full-screen canvas */}
           <KnowledgeGraph
             data={data!}

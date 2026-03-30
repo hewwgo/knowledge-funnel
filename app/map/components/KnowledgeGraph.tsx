@@ -127,15 +127,15 @@ export default function KnowledgeGraph({
 
     hubNode.append("circle")
       .attr("r", (d) => hubScale(d.submissionCount))
-      .attr("fill", "rgba(38,38,36,0.05)")
-      .attr("stroke", "rgba(38,38,36,0.25)")
-      .attr("stroke-width", 1.5)
+      .attr("fill", "rgba(38,38,36,0.06)")
+      .attr("stroke", "rgba(38,38,36,0.35)")
+      .attr("stroke-width", 2)
       .attr("class", "hub-circle")
       .attr("cursor", "pointer");
 
     hubNode.append("text")
       .attr("text-anchor", "middle").attr("dy", 4)
-      .attr("fill", "rgba(38,38,36,0.7)")
+      .attr("fill", "#262624")
       .attr("font-size", "11px").attr("font-weight", "700")
       .attr("class", "hub-inner-label")
       .attr("pointer-events", "none")
