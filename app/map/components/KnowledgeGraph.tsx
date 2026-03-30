@@ -123,20 +123,20 @@ export default function KnowledgeGraph({
 
     const hubScale = d3.scaleSqrt()
       .domain([2, Math.max(...hubs.map(h => h.submissionCount), 3)])
-      .range([12, 28]);
+      .range([16, 34]);
 
     hubNode.append("circle")
       .attr("r", (d) => hubScale(d.submissionCount))
-      .attr("fill", "rgba(38,38,36,0.03)")
-      .attr("stroke", "rgba(38,38,36,0.15)")
-      .attr("stroke-width", 1)
+      .attr("fill", "rgba(38,38,36,0.05)")
+      .attr("stroke", "rgba(38,38,36,0.25)")
+      .attr("stroke-width", 1.5)
       .attr("class", "hub-circle")
       .attr("cursor", "pointer");
 
     hubNode.append("text")
       .attr("text-anchor", "middle").attr("dy", 4)
-      .attr("fill", "rgba(38,38,36,0.6)")
-      .attr("font-size", "10px").attr("font-weight", "700")
+      .attr("fill", "rgba(38,38,36,0.7)")
+      .attr("font-size", "11px").attr("font-weight", "700")
       .attr("class", "hub-inner-label")
       .attr("pointer-events", "none")
       .text((d) => d.label.length > 20 ? d.label.slice(0, 18) + "…" : d.label);
@@ -397,7 +397,8 @@ export default function KnowledgeGraph({
 
     applySemanticZoom(1);
     return () => { svg.selectAll("*").remove(); };
-  }, [data, hiddenResearchers, searchQuery, isNodeActive, onSelectNode, onSelectCluster, selectedClusterId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, hiddenResearchers, searchQuery, isNodeActive]);
 
   // Selection highlight
   useEffect(() => {
