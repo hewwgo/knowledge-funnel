@@ -39,10 +39,27 @@ export interface Researcher {
   submissionCount: number;
 }
 
+export interface ConceptHub {
+  id: string;
+  label: string;
+  x: number;
+  y: number;
+  submissionCount: number;
+  isHub: true;
+}
+
+export interface ConceptEdge {
+  from: string;
+  to: string;
+  type: "concept-link";
+}
+
 export interface MapData {
   nodes: MapNode[];
   clusters: Cluster[];
   researchers: Researcher[];
+  conceptHubs: ConceptHub[];
+  conceptEdges: ConceptEdge[];
   computedAt: string | null;
 }
 

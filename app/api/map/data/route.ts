@@ -131,10 +131,51 @@ export async function GET() {
       submitterIds: [...new Set(members.map((m) => m.submitterId))],
     }));
 
+    // 6. Build concept hub nodes (positioned at centroid of their submissions)
+    const conceptHubs: {
+      id: string; label: string; x: number; y: number;
+      submissionCount: number; isHub: true;
+    }[] = [];
+    const conceptEdges: {
+      from: string; to: string; type: "concept-link";
+    }[] = [];
+
+    // Only create hubs for concepts shared by 2+ submissions
+    for (const [label, freq] of conceptFrequency) {
+      if (freq < 2) continue;
+
+      // Find all submissions with this concept
+      const memberNodes = nodes.filter((n: { concepts: string[] }) =>
+        n.concepts.includes(label)
+      );
+      if (memberNodes.length < 2) continue;
+
+      // Position hub at centroid of its members
+      const hubX = memberNodes.reduce((s: number, n: { x: number }) => s + n.x, 0) / memberNodes.length;
+      const hubY = memberNodes.reduce((s: number, n: { y: number }) => s + n.y, 0) / memberNodes.length;
+
+      const hubId = `concept-${label.replace(/\s+/g, "-")}`;
+      conceptHubs.push({
+        id: hubId,
+        label,
+        x: hubX,
+        y: hubY,
+        submissionCount: memberNodes.length,
+        isHub: true,
+      });
+
+      // Create edges from hub to each member submission
+      for (const mn of memberNodes) {
+        conceptEdges.push({ from: hubId, to: (mn as { id: string }).id, type: "concept-link" });
+      }
+    }
+
     return NextResponse.json({
       nodes,
       clusters,
       researchers: Array.from(researcherMap.values()),
+      conceptHubs,
+      conceptEdges,
       computedAt: projections[0]?.computed_at || null,
     });
   } catch (error: unknown) {
