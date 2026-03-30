@@ -934,17 +934,25 @@ body {
   top: 12px;
   right: 12px;
   z-index: 10;
-  width: 300px;
+  width: 340px;
   max-height: calc(100vh - 120px);
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .map-float-detail .map-detail {
   width: 100%;
-  background: rgba(255, 244, 235, 0.95);
+  background: rgba(255, 244, 235, 0.96);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(212, 165, 116, 0.25);
+  border: 1px solid rgba(212, 165, 116, 0.2);
   box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
+  overflow-x: hidden;
+}
+
+.map-float-detail .map-detail * {
+  max-width: 100%;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
 }
 
 /* Controls sidebar (used inside float wrapper now) */

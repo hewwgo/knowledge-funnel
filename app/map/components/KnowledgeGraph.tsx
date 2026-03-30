@@ -242,9 +242,9 @@ export default function KnowledgeGraph({
     // ── Layer 5: Submission nodes ──
     const nodeGroup = g.append("g").attr("class", "nodes");
     const NODE_R = 5;
-    const CARD_W = 170;
-    const CARD_H = 32;
-    const FOLD = 8;
+    const CARD_W = 145;
+    const CARD_H = 24;
+    const FOLD = 6;
 
     const node = nodeGroup.selectAll<SVGGElement, MapNode>("g")
       .data(nodes).join("g")
@@ -260,54 +260,53 @@ export default function KnowledgeGraph({
       const x = -CARD_W / 2, y = -CARD_H / 2;
 
       if (isPaper) {
-        // Paper: white card with folded corner + shadow
+        // Paper: clean white card with subtle fold
         el.append("path")
           .attr("class", "graph-card")
           .attr("d", `M${x},${y} L${x + CARD_W - FOLD},${y} L${x + CARD_W},${y + FOLD} L${x + CARD_W},${y + CARD_H} L${x},${y + CARD_H} Z`)
           .attr("fill", "#ffffff")
-          .attr("stroke", hexToRgba(d.submitterColor, 0.35))
-          .attr("stroke-width", 1)
-          .attr("filter", "drop-shadow(0 1px 3px rgba(0,0,0,0.08))")
+          .attr("stroke", hexToRgba(d.submitterColor, 0.25))
+          .attr("stroke-width", 0.7)
+          .attr("filter", "drop-shadow(0 0.5px 2px rgba(0,0,0,0.06))")
           .attr("opacity", 0);
-        // Fold
         el.append("path")
           .attr("class", "graph-card-fold")
           .attr("d", `M${x + CARD_W - FOLD},${y} L${x + CARD_W - FOLD},${y + FOLD} L${x + CARD_W},${y + FOLD}`)
-          .attr("fill", hexToRgba(d.submitterColor, 0.15))
-          .attr("stroke", hexToRgba(d.submitterColor, 0.25))
-          .attr("stroke-width", 0.5)
+          .attr("fill", hexToRgba(d.submitterColor, 0.1))
+          .attr("stroke", hexToRgba(d.submitterColor, 0.15))
+          .attr("stroke-width", 0.4)
           .attr("opacity", 0);
       } else {
-        // Note/idea: tinted rounded card with dashed border
+        // Note/idea: subtle tinted card with dashed border
         el.append("rect")
           .attr("class", "graph-card")
           .attr("x", x).attr("y", y)
           .attr("width", CARD_W).attr("height", CARD_H)
-          .attr("rx", 6)
-          .attr("fill", hexToRgba(d.submitterColor, 0.08))
-          .attr("stroke", hexToRgba(d.submitterColor, 0.3))
-          .attr("stroke-width", 1)
-          .attr("stroke-dasharray", "4,2")
+          .attr("rx", 4)
+          .attr("fill", hexToRgba(d.submitterColor, 0.05))
+          .attr("stroke", hexToRgba(d.submitterColor, 0.2))
+          .attr("stroke-width", 0.7)
+          .attr("stroke-dasharray", "3,2")
           .attr("opacity", 0);
       }
     });
 
-    // Card title — readable size
+    // Card title
     node.append("text").attr("class", "graph-card-title")
-      .attr("x", -CARD_W / 2 + 8).attr("y", -2)
+      .attr("x", -CARD_W / 2 + 6).attr("y", 1)
       .attr("fill", "#262624")
-      .attr("font-size", "9px").attr("font-weight", "600")
+      .attr("font-size", "8px").attr("font-weight", "500")
       .attr("opacity", 0)
       .text((d) => {
         const t = cleanTitle(d.title);
-        return t.length > 30 ? t.slice(0, 28) + "…" : t;
+        return t.length > 26 ? t.slice(0, 24) + "…" : t;
       });
 
-    // Card submitter name
+    // Card submitter (shown at deeper zoom)
     node.append("text").attr("class", "graph-card-submitter")
-      .attr("x", -CARD_W / 2 + 8).attr("y", 11)
-      .attr("fill", "rgba(38,38,36,0.4)")
-      .attr("font-size", "7.5px")
+      .attr("x", -CARD_W / 2 + 6).attr("y", 11)
+      .attr("fill", "rgba(38,38,36,0.35)")
+      .attr("font-size", "6.5px")
       .attr("opacity", 0)
       .text((d) => d.submitterName);
 

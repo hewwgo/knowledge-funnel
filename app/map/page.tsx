@@ -200,7 +200,7 @@ export default function MapPage() {
           <h1 className="map-toolbar-brand">Tessera</h1>
           {data && data.nodes.length > 0 && (
             <span className="map-toolbar-stats">
-              {data.nodes.length} submissions &middot; {data.clusters.length} clusters
+              {data.nodes.length} submissions &middot; {data.researchers.length} authors &middot; {data.clusters.length} clusters
             </span>
           )}
         </div>
@@ -253,8 +253,6 @@ export default function MapPage() {
               </div>
             )}
           </div>
-        </div>
-        <div className="map-toolbar-right">
           <button
             className="map-toolbar-dropdown-btn"
             onClick={() => setShowClusters(!showClusters)}
@@ -263,8 +261,10 @@ export default function MapPage() {
               fontSize: 10,
             }}
           >
-            {showClusters ? "Hide" : "Show"} Clusters
+            Toggle k-means
           </button>
+        </div>
+        <div className="map-toolbar-right">
           {computeProgress && (
             <span style={{ fontSize: "11px", color: "rgba(38,38,36,0.5)" }}>{computeProgress}</span>
           )}
