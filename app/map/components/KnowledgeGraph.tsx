@@ -298,9 +298,9 @@ export default function KnowledgeGraph({
 
     // ── Semantic zoom — 3 levels ──
     function applySemanticZoom(k: number) {
-      const LEVEL_OVERVIEW = k < 0.7;  // Mega-dots only
-      const LEVEL_MID = k >= 0.7 && k < 2.2; // Dots + cluster labels + edges
-      const LEVEL_DETAIL = k >= 2.2;   // Cards
+      const LEVEL_OVERVIEW = k < 0.65;  // Mega-dots only
+      const LEVEL_MID = k >= 0.65 && k < 1.5; // Dots + cluster labels + edges
+      const LEVEL_DETAIL = k >= 1.5;   // Cards
 
       // Mega-dots: visible only at overview
       megaDotGroup.selectAll(".mega-dot, .mega-dot-label, .mega-dot-count")
@@ -338,7 +338,7 @@ export default function KnowledgeGraph({
         if (LEVEL_DETAIL) {
           el.select(".graph-card").attr("opacity", 1);
           el.select(".graph-card-title").attr("opacity", 1);
-          el.select(".graph-card-submitter").attr("opacity", k > 3 ? 1 : 0);
+          el.select(".graph-card-submitter").attr("opacity", k > 2 ? 1 : 0);
           el.select(".graph-node").attr("opacity", 0);
         } else {
           el.select(".graph-card").attr("opacity", 0);

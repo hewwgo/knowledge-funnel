@@ -772,15 +772,19 @@ body {
   flex: 1;
   display: flex;
   overflow: hidden;
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 /* Controls sidebar */
 .map-controls {
-  width: 240px;
+  width: 190px;
   flex-shrink: 0;
-  border-right: 1.5px solid rgba(38, 38, 36, 0.15);
-  padding: 16px;
+  border-right: 1px solid rgba(38, 38, 36, 0.1);
+  padding: 12px;
   overflow-y: auto;
+  font-size: 11px;
 }
 
 .map-controls-section {
