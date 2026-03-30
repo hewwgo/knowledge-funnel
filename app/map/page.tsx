@@ -214,33 +214,22 @@ export default function MapPage() {
               <button onClick={() => setSearchQuery("")} className="map-toolbar-search-clear">&times;</button>
             )}
           </div>
-          {/* Researcher filter dropdown */}
-          <div className="map-toolbar-filter">
-            <select
-              onChange={(e) => {
-                const val = e.target.value;
-                if (val === "all") {
-                  setHiddenResearchers(new Set());
-                } else if (val === "none") {
-                  setHiddenResearchers(new Set(data?.researchers.map(r => r.id) || []));
-                } else {
-                  // Toggle single researcher: show only this one
-                  const allIds = new Set(data?.researchers.map(r => r.id) || []);
-                  allIds.delete(val);
-                  setHiddenResearchers(allIds);
-                }
-                e.target.value = ""; // reset dropdown
-              }}
-              defaultValue=""
-            >
-              <option value="" disabled>Filter researchers...</option>
-              <option value="all">Show all</option>
-              {data?.researchers.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.name} ({r.submissionCount})
-                </option>
-              ))}
-            </select>
+          {/* Researcher toggles */}
+          <div className="map-toolbar-researchers">
+            {data?.researchers.map((r) => (
+              <button
+                key={r.id}
+                className="map-toolbar-researcher-chip"
+                onClick={() => toggleResearcher(r.id)}
+                style={{
+                  opacity: hiddenResearchers.has(r.id) ? 0.3 : 1,
+                  borderColor: r.color,
+                }}
+              >
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: r.color, flexShrink: 0 }} />
+                <span>{r.name}</span>
+              </button>
+            ))}
           </div>
         </div>
         <div className="map-toolbar-right">

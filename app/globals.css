@@ -762,15 +762,31 @@ body {
   line-height: 1;
 }
 
-.map-toolbar-filter select {
-  padding: 5px 8px;
-  border: 1px solid rgba(38, 38, 36, 0.15);
-  font-size: 11px;
+.map-toolbar-researchers {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+
+.map-toolbar-researcher-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid;
+  background: #ffffff;
+  font-size: 10px;
   font-family: "Inter", sans-serif;
   color: #262624;
-  background: rgba(38, 38, 36, 0.02);
-  outline: none;
   cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+}
+
+.map-toolbar-researcher-chip:hover {
+  background: rgba(38, 38, 36, 0.03);
 }
 
 .map-toolbar-right {
