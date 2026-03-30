@@ -96,22 +96,8 @@ export default function KnowledgeGraph({
     for (const n of nodes) nodePos.set(n.id, { x: xScale(n.x), y: yScale(n.y) });
     for (const h of hubs) nodePos.set(h.id, { x: xScale(h.x), y: yScale(h.y) });
 
-    // ── Layer 1: K-means cluster labels (the regional names) ──
-    const clusterLabelGroup = g.append("g").attr("class", "cluster-labels");
-    for (const c of clusterData) {
-      if (c.sp.length < 2) continue;
-      const topY = Math.min(...c.sp.map(p => p[1]));
-      clusterLabelGroup.append("text")
-        .attr("x", c.cx).attr("y", topY - 20)
-        .attr("text-anchor", "middle")
-        .attr("fill", hexToRgba(c.color, 0.6))
-        .attr("font-size", "14px").attr("font-weight", "700")
-        .attr("letter-spacing", "0.04em")
-        .attr("class", "cluster-label")
-        .attr("cursor", "pointer")
-        .on("click", (e) => { e.stopPropagation(); onSelectCluster(c.id); })
-        .text(c.label);
-    }
+    // K-means labels removed from canvas — concept hubs are the primary structure.
+    // K-means still used for mega-dots (overview) and cluster detail panel.
 
     // ── Layer 2: Hub spoke edges ──
     const edgeGroup = g.append("g").attr("class", "hub-edges");
@@ -143,14 +129,51 @@ export default function KnowledgeGraph({
       .attr("fill", "rgba(38,38,36,0.03)")
       .attr("stroke", "rgba(38,38,36,0.15)")
       .attr("stroke-width", 1)
-      .attr("class", "hub-circle");
+      .attr("class", "hub-circle")
+      .attr("cursor", "pointer");
 
     hubNode.append("text")
       .attr("text-anchor", "middle").attr("dy", 3)
-      .attr("fill", "rgba(38,38,36,0.45)")
+      .attr("fill", "rgba(38,38,36,0.5)")
       .attr("font-size", "8px").attr("font-weight", "600")
       .attr("class", "hub-inner-label")
+      .attr("pointer-events", "none")
       .text((d) => d.label.length > 18 ? d.label.slice(0, 16) + "…" : d.label);
+
+    // Hub hover + click
+    hubNode
+      .on("mouseenter", (event, d) => {
+        d3.select(event.currentTarget).select(".hub-circle")
+          .attr("fill", "rgba(38,38,36,0.06)")
+          .attr("stroke", "rgba(38,38,36,0.3)");
+        tooltip.style("display", "block")
+          .style("left", `${event.pageX + 14}px`)
+          .style("top", `${event.pageY - 14}px`)
+          .html(
+            `<div style="margin-bottom:4px"><strong>${d.label}</strong></div>` +
+            `<div style="color:rgba(255,255,255,0.6);font-size:11px">${d.submissionCount} submissions share this concept</div>`
+          );
+      })
+      .on("mousemove", (event) => {
+        tooltip.style("left", `${event.pageX + 14}px`).style("top", `${event.pageY - 14}px`);
+      })
+      .on("mouseleave", (event) => {
+        d3.select(event.currentTarget).select(".hub-circle")
+          .attr("fill", "rgba(38,38,36,0.03)")
+          .attr("stroke", "rgba(38,38,36,0.15)");
+        tooltip.style("display", "none");
+      })
+      .on("click", (event, d) => {
+        event.stopPropagation();
+        // Find the cluster that contains most hub members and select it
+        const hubMemberIds = hubEdges
+          .filter(e => e.from === d.id)
+          .map(e => e.to);
+        if (hubMemberIds.length > 0) {
+          // Select the first member node to show detail
+          onSelectNode(hubMemberIds[0]);
+        }
+      });
 
     // ── Layer 4: Mega-dots (overview only) ──
     const megaGroup = g.append("g").attr("class", "mega-dots");
@@ -255,11 +278,6 @@ export default function KnowledgeGraph({
       // Mega-dots: overview only
       megaGroup.selectAll(".mega-dot, .mega-dot-label, .mega-dot-count")
         .attr("opacity", OVERVIEW ? 1 : 0);
-
-      // K-means cluster labels: scale inversely, always readable
-      clusterLabelGroup.selectAll<SVGTextElement, unknown>(".cluster-label")
-        .attr("opacity", OVERVIEW ? 0 : MID ? 0.7 : 0.35)
-        .attr("font-size", `${Math.max(11, Math.min(18, 14 / k))}px`);
 
       // Hub edges + nodes
       edgeGroup.selectAll(".hub-edge").attr("opacity", OVERVIEW ? 0 : 1);

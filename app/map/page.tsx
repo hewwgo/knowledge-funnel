@@ -74,6 +74,7 @@ export default function MapPage() {
   const [computing, setComputing] = useState(false);
   const [computeProgress, setComputeProgress] = useState("");
   const [multiSelectIds, setMultiSelectIds] = useState<Set<string>>(new Set());
+  const [filterOpen, setFilterOpen] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -214,22 +215,42 @@ export default function MapPage() {
               <button onClick={() => setSearchQuery("")} className="map-toolbar-search-clear">&times;</button>
             )}
           </div>
-          {/* Researcher toggles */}
-          <div className="map-toolbar-researchers">
-            {data?.researchers.map((r) => (
-              <button
-                key={r.id}
-                className="map-toolbar-researcher-chip"
-                onClick={() => toggleResearcher(r.id)}
-                style={{
-                  opacity: hiddenResearchers.has(r.id) ? 0.3 : 1,
-                  borderColor: r.color,
-                }}
+          {/* Researcher filter dropdown */}
+          <div className="map-toolbar-dropdown" style={{ position: "relative" }}>
+            <button
+              className="map-toolbar-dropdown-btn"
+              onClick={() => setFilterOpen(!filterOpen)}
+            >
+              Researchers
+              {hiddenResearchers.size > 0 && (
+                <span style={{ marginLeft: 4, fontSize: 9, opacity: 0.5 }}>
+                  ({(data?.researchers.length || 0) - hiddenResearchers.size}/{data?.researchers.length})
+                </span>
+              )}
+              <span style={{ marginLeft: 4, fontSize: 8 }}>{filterOpen ? "▴" : "▾"}</span>
+            </button>
+            {filterOpen && (
+              <div className="map-toolbar-dropdown-menu"
+                onClick={(e) => e.stopPropagation()}
               >
-                <span style={{ width: 8, height: 8, borderRadius: "50%", background: r.color, flexShrink: 0 }} />
-                <span>{r.name}</span>
-              </button>
-            ))}
+                {data?.researchers.map((r) => (
+                  <button
+                    key={r.id}
+                    className="map-toolbar-dropdown-item"
+                    onClick={() => toggleResearcher(r.id)}
+                    style={{ opacity: hiddenResearchers.has(r.id) ? 0.4 : 1 }}
+                  >
+                    <span style={{
+                      width: 10, height: 10, borderRadius: "50%",
+                      background: hiddenResearchers.has(r.id) ? "rgba(38,38,36,0.15)" : r.color,
+                      flexShrink: 0, border: `1px solid ${r.color}`,
+                    }} />
+                    <span style={{ flex: 1 }}>{r.name}</span>
+                    <span style={{ fontSize: 9, color: "rgba(38,38,36,0.4)" }}>{r.submissionCount}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
         <div className="map-toolbar-right">
@@ -263,7 +284,7 @@ export default function MapPage() {
           </button>
         </div>
       ) : (
-        <div className="map-fullscreen">
+        <div className="map-fullscreen" onClick={() => setFilterOpen(false)}>
           {/* Full-screen canvas */}
           <KnowledgeGraph
             data={data!}
