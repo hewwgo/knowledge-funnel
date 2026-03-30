@@ -192,6 +192,26 @@ export default function KnowledgeGraph({
       })
       .on("click", (event, d) => {
         event.stopPropagation();
+
+        // Toggle: if same hub clicked again, reset everything
+        const currentlySelected = d3.select(event.currentTarget).attr("data-selected");
+        const isDeselecting = currentlySelected === "true";
+
+        // Reset ALL hub highlights first
+        hubNode.attr("data-selected", null);
+        edgeGroup.selectAll<SVGLineElement, unknown>(".hub-edge")
+          .attr("stroke", "rgba(38,38,36,0.08)")
+          .attr("stroke-width", 0.6);
+        node.each(function () {
+          d3.select(this).select(".graph-node")
+            .attr("r", NODE_R)
+            .attr("stroke", "white").attr("stroke-width", 1);
+        });
+
+        if (isDeselecting) return;
+
+        // Select this hub
+        d3.select(event.currentTarget).attr("data-selected", "true");
         const hubMemberIds = new Set(
           hubEdges.filter(e => e.from === d.id).map(e => e.to)
         );
@@ -209,9 +229,8 @@ export default function KnowledgeGraph({
 
         // Highlight connected nodes
         node.each(function (n) {
-          const el = d3.select(this);
           if (hubMemberIds.has(n.id)) {
-            el.select(".graph-node")
+            d3.select(this).select(".graph-node")
               .transition().duration(150)
               .attr("r", NODE_R + 3)
               .attr("stroke", "#262624").attr("stroke-width", 2);
@@ -219,25 +238,9 @@ export default function KnowledgeGraph({
         });
       });
 
-    // ── Layer 4: Mega-dots (overview only) ──
-    const megaGroup = g.append("g").attr("class", "mega-dots");
-    for (const c of clusterData) {
-      const r = Math.max(18, Math.min(36, c.memberCount * 3.5));
-      megaGroup.append("circle").attr("cx", c.cx).attr("cy", c.cy).attr("r", r)
-        .attr("fill", hexToRgba(c.color, 0.2))
-        .attr("stroke", hexToRgba(c.color, 0.45))
-        .attr("stroke-width", 1.5).attr("class", "mega-dot")
-        .attr("cursor", "pointer")
-        .on("click", (e) => { e.stopPropagation(); onSelectCluster(c.id); });
-      megaGroup.append("text").attr("x", c.cx).attr("y", c.cy + r + 15)
-        .attr("text-anchor", "middle").attr("fill", "#262624")
-        .attr("font-size", "13px").attr("font-weight", "700")
-        .attr("class", "mega-dot-label").text(c.label);
-      megaGroup.append("text").attr("x", c.cx).attr("y", c.cy + 4)
-        .attr("text-anchor", "middle").attr("fill", hexToRgba(c.color, 0.7))
-        .attr("font-size", "12px").attr("font-weight", "700")
-        .attr("class", "mega-dot-count").text(c.memberCount);
-    }
+    // ── Layer 4: Overview markers (concept hubs, bold at overview zoom) ──
+    // At overview zoom, concept hubs become the primary landmarks
+    // No separate mega-dots — hubs serve this role
 
     // ── Layer 5: Submission nodes ──
     const nodeGroup = g.append("g").attr("class", "nodes");
@@ -338,16 +341,18 @@ export default function KnowledgeGraph({
       const MID = k >= 0.65 && k < 1.5;
       const DETAIL = k >= 1.5;
 
-      // Mega-dots: overview only
-      megaGroup.selectAll(".mega-dot, .mega-dot-label, .mega-dot-count")
-        .attr("opacity", OVERVIEW ? 1 : 0);
-
-      // Hub edges + nodes
+      // Hub edges: hidden at overview, visible otherwise
       edgeGroup.selectAll(".hub-edge").attr("opacity", OVERVIEW ? 0 : 1);
-      hubNode.attr("opacity", OVERVIEW ? 0 : MID ? 1 : 0.5);
-      // Scale hub labels with zoom
+
+      // Hub nodes: BOLD at overview (they are the landmarks), normal at mid/detail
+      hubNode.attr("opacity", 1); // always visible
+      hubNode.selectAll<SVGCircleElement, unknown>(".hub-circle")
+        .attr("fill", OVERVIEW ? "rgba(38,38,36,0.06)" : "rgba(38,38,36,0.03)")
+        .attr("stroke", OVERVIEW ? "rgba(38,38,36,0.3)" : "rgba(38,38,36,0.15)")
+        .attr("stroke-width", OVERVIEW ? 1.5 : 1);
       hubNode.selectAll<SVGTextElement, unknown>(".hub-inner-label")
-        .attr("font-size", `${Math.max(6, Math.min(10, 8 / k))}px`);
+        .attr("font-size", OVERVIEW ? "13px" : `${Math.max(7, Math.min(11, 9 / k))}px`)
+        .attr("fill", OVERVIEW ? "rgba(38,38,36,0.75)" : "rgba(38,38,36,0.6)");
 
       // Submission nodes
       node.each(function (d) {
@@ -358,12 +363,20 @@ export default function KnowledgeGraph({
         if (DETAIL) {
           el.selectAll(".graph-card, .graph-card-fold").attr("opacity", 1);
           el.select(".graph-card-title").attr("opacity", 1);
-          el.select(".graph-card-submitter").attr("opacity", k > 2.5 ? 1 : 0);
+          el.select(".graph-card-submitter").attr("opacity", k > 1.8 ? 1 : 0);
           el.select(".graph-node").attr("opacity", 0);
-          // Scale title font inversely — bigger text at higher zoom so it reads well
+
+          // Scale font inversely with zoom
           const fontSize = Math.max(5, Math.min(9, 11 / k));
           el.select(".graph-card-title").attr("font-size", `${fontSize}px`);
           el.select(".graph-card-submitter").attr("font-size", `${Math.max(4, fontSize - 1.5)}px`);
+
+          // Show more of the title as we zoom in
+          const maxChars = Math.min(80, Math.floor(20 + k * 15));
+          const fullTitle = el.select(".graph-card-title").attr("data-full-title") || "";
+          el.select(".graph-card-title").text(
+            fullTitle.length > maxChars ? fullTitle.slice(0, maxChars - 2) + "…" : fullTitle
+          );
         } else {
           el.selectAll(".graph-card, .graph-card-fold").attr("opacity", 0);
           el.select(".graph-card-title").attr("opacity", 0);
