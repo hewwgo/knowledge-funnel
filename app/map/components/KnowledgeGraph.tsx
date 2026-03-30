@@ -180,7 +180,7 @@ export default function KnowledgeGraph({
         .text(c.label);
     }
 
-    // ── Layer 4: Concept hub edges (spokes) ──
+    // ── Layer 4: Concept hub edges (spokes — subtle) ──
     const edgeGroup = g.append("g").attr("class", "hub-edges");
     for (const edge of hubEdges) {
       const from = nodePos.get(edge.from);
@@ -189,8 +189,9 @@ export default function KnowledgeGraph({
       edgeGroup.append("line")
         .attr("x1", from.x).attr("y1", from.y)
         .attr("x2", to.x).attr("y2", to.y)
-        .attr("stroke", "rgba(38,38,36,0.12)")
-        .attr("stroke-width", 0.8)
+        .attr("stroke", "rgba(38,38,36,1)")
+        .attr("stroke-width", 0.5)
+        .attr("stroke-opacity", 0.07)
         .attr("class", "hub-edge")
         .attr("opacity", 0);
     }
@@ -235,26 +236,34 @@ export default function KnowledgeGraph({
       .attr("cursor", "pointer")
       .attr("opacity", 0);
 
-    // Card rect
+    // Card background
     node.append("rect").attr("class", "graph-card")
       .attr("x", -CARD_W / 2).attr("y", -CARD_H / 2)
       .attr("width", CARD_W).attr("height", CARD_H)
-      .attr("rx", 2)
-      .attr("fill", (d) => hexToRgba(d.submitterColor, 0.06))
-      .attr("stroke", "rgba(38,38,36,0.08)")
+      .attr("rx", 1)
+      .attr("fill", "#ffffff")
+      .attr("stroke", "rgba(38,38,36,0.1)")
       .attr("stroke-width", 0.5)
+      .attr("opacity", 0)
+      .attr("filter", "drop-shadow(0 1px 2px rgba(0,0,0,0.04))");
+
+    // Content type indicator — thin colored left bar
+    node.append("rect").attr("class", "graph-card-type")
+      .attr("x", -CARD_W / 2).attr("y", -CARD_H / 2)
+      .attr("width", 3).attr("height", CARD_H)
+      .attr("rx", 1)
+      .attr("fill", (d) => d.submitterColor)
       .attr("opacity", 0);
 
-    // Card content: icon + title (compact)
+    // Card title text
     node.append("text").attr("class", "graph-card-title")
-      .attr("x", -CARD_W / 2 + 6).attr("y", 1)
+      .attr("x", -CARD_W / 2 + 8).attr("y", 1)
       .attr("fill", "#262624")
-      .attr("font-size", "8px").attr("font-weight", "500")
+      .attr("font-size", "7.5px").attr("font-weight", "500")
       .attr("opacity", 0)
       .text((d) => {
-        const icon = contentIcon(d.contentType);
         const t = cleanTitle(d.title);
-        return `${icon} ${t.length > 22 ? t.slice(0, 20) + "…" : t}`;
+        return t.length > 24 ? t.slice(0, 22) + "…" : t;
       });
 
     // Dot
@@ -288,9 +297,9 @@ export default function KnowledgeGraph({
         .attr("opacity", MID ? 0.8 : DETAIL ? 0.3 : 0)
         .attr("font-size", `${Math.max(10, Math.min(16, 13 / k))}px`);
 
-      // Hub edges — visible at mid+
+      // Hub edges — subtle, visible at mid+
       edgeGroup.selectAll(".hub-edge")
-        .attr("opacity", OVERVIEW ? 0 : MID ? 0.7 : 0.4);
+        .attr("opacity", OVERVIEW ? 0 : 1);
 
       // Hub nodes — visible at mid
       hubNode.attr("opacity", OVERVIEW ? 0 : MID ? 1 : 0.4);
@@ -303,10 +312,12 @@ export default function KnowledgeGraph({
         el.attr("opacity", 1);
         if (DETAIL) {
           el.select(".graph-card").attr("opacity", 1);
+          el.select(".graph-card-type").attr("opacity", 1);
           el.select(".graph-card-title").attr("opacity", 1);
           el.select(".graph-node").attr("opacity", 0);
         } else {
           el.select(".graph-card").attr("opacity", 0);
+          el.select(".graph-card-type").attr("opacity", 0);
           el.select(".graph-card-title").attr("opacity", 0);
           el.select(".graph-node").attr("opacity", 1);
         }
@@ -326,8 +337,8 @@ export default function KnowledgeGraph({
           .style("left", `${event.pageX + 14}px`)
           .style("top", `${event.pageY - 14}px`)
           .html(
-            `<div style="margin-bottom:4px"><strong>${contentIcon(d.contentType)} ${cleanTitle(d.title)}</strong></div>` +
-            `<div style="color:rgba(255,255,255,0.6);font-size:11px;margin-bottom:3px">by ${d.submitterName}</div>` +
+            `<div style="margin-bottom:4px"><strong>${cleanTitle(d.title)}</strong></div>` +
+            `<div style="color:rgba(255,255,255,0.6);font-size:11px;margin-bottom:3px">${d.contentType} · by ${d.submitterName}</div>` +
             (d.concepts.length > 0 ? `<div style="color:rgba(255,255,255,0.4);font-size:10px">${d.concepts.join(" · ")}</div>` : "") +
             `<div style="color:rgba(255,255,255,0.3);font-size:9px;margin-top:4px">Click · Shift+click to select</div>`
           );
@@ -368,7 +379,11 @@ export default function KnowledgeGraph({
       .attr("stroke-width", (d) =>
         d.id === selectedNodeId ? 1.5 : multiSelectIds.has(d.id) ? 1.5 : 0.5)
       .attr("stroke", (d) =>
-        d.id === selectedNodeId ? "#262624" : multiSelectIds.has(d.id) ? "#D55E00" : "rgba(38,38,36,0.08)");
+        d.id === selectedNodeId ? "#262624" : multiSelectIds.has(d.id) ? "#D55E00" : "rgba(38,38,36,0.1)");
+
+    svg.selectAll<SVGRectElement, MapNode>(".graph-card-type")
+      .attr("fill", (d) =>
+        multiSelectIds.has(d.id) ? "#D55E00" : d.submitterColor);
 
     // Multi-select lines
     const g = svg.select("g");

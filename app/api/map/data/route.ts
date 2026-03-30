@@ -140,9 +140,13 @@ export async function GET() {
       from: string; to: string; type: "concept-link";
     }[] = [];
 
-    // Only create hubs for concepts shared by 2+ submissions
-    for (const [label, freq] of conceptFrequency) {
-      if (freq < 2) continue;
+    // Only create hubs for the most connected concepts (top 8, min 3 submissions)
+    const sortedConcepts = Array.from(conceptFrequency.entries())
+      .filter(([, freq]) => freq >= 3)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8);
+
+    for (const [label] of sortedConcepts) {
 
       // Find all submissions with this concept
       const memberNodes = nodes.filter((n: { concepts: string[] }) =>

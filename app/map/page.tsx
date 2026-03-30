@@ -192,27 +192,68 @@ export default function MapPage() {
 
   return (
     <div className="map-page">
-      {/* Header */}
-      <header className="map-header">
-        <div className="map-header-left">
-          <a href="/" className="map-back">&larr;</a>
-          <h1 className="map-title">Tessera &mdash; Knowledge Map</h1>
+      {/* Toolbar */}
+      <header className="map-toolbar">
+        <div className="map-toolbar-left">
+          <h1 className="map-toolbar-brand">Tessera</h1>
           {data && data.nodes.length > 0 && (
-            <span className="map-computed-at">
+            <span className="map-toolbar-stats">
               {data.nodes.length} submissions &middot; {data.clusters.length} clusters
             </span>
           )}
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+        <div className="map-toolbar-center">
+          <div className="map-toolbar-search">
+            <input
+              type="text"
+              placeholder="Search titles, concepts..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery("")} className="map-toolbar-search-clear">&times;</button>
+            )}
+          </div>
+          {/* Researcher filter dropdown */}
+          <div className="map-toolbar-filter">
+            <select
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === "all") {
+                  setHiddenResearchers(new Set());
+                } else if (val === "none") {
+                  setHiddenResearchers(new Set(data?.researchers.map(r => r.id) || []));
+                } else {
+                  // Toggle single researcher: show only this one
+                  const allIds = new Set(data?.researchers.map(r => r.id) || []);
+                  allIds.delete(val);
+                  setHiddenResearchers(allIds);
+                }
+                e.target.value = ""; // reset dropdown
+              }}
+              defaultValue=""
+            >
+              <option value="" disabled>Filter researchers...</option>
+              <option value="all">Show all</option>
+              {data?.researchers.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name} ({r.submissionCount})
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="map-toolbar-right">
           {computeProgress && (
-            <span style={{ fontSize: "12px", color: "#666" }}>{computeProgress}</span>
+            <span style={{ fontSize: "11px", color: "rgba(38,38,36,0.5)" }}>{computeProgress}</span>
           )}
           <button
             className="map-btn"
             onClick={handleCompute}
             disabled={computing}
+            style={{ padding: "5px 14px", fontSize: 10 }}
           >
-            {computing ? "Computing..." : "Recompute Map"}
+            {computing ? "Computing..." : "Recompute"}
           </button>
         </div>
       </header>
@@ -246,24 +287,6 @@ export default function MapPage() {
             multiSelectIds={multiSelectIds}
             onToggleMultiSelect={handleToggleMultiSelect}
           />
-
-          {/* Floating controls — top left */}
-          <div className="map-float-controls">
-            <MapControls
-              researchers={data!.researchers}
-              hiddenResearchers={hiddenResearchers}
-              toggleResearcher={toggleResearcher}
-              searchQuery={searchQuery}
-              setSearchQuery={setSearchQuery}
-              totalNodes={data!.nodes.length}
-              matchingNodes={searchQuery
-                ? data!.nodes.filter((n) =>
-                    n.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    n.concepts.some((c) => c.toLowerCase().includes(searchQuery.toLowerCase()))
-                  ).length
-                : data!.nodes.length}
-            />
-          </div>
 
           {/* Floating detail panel — right side */}
           {(selectedNode || multiSelectIds.size > 0) && (
