@@ -256,9 +256,9 @@ export default function KnowledgeGraph({
       .attr("x", -CARD_W / 2).attr("y", -CARD_H / 2)
       .attr("width", CARD_W).attr("height", CARD_H)
       .attr("rx", 2)
-      .attr("fill", (d) => hexToRgba(d.submitterColor, 0.07))
-      .attr("stroke", (d) => hexToRgba(d.submitterColor, 0.2))
-      .attr("stroke-width", 1)
+      .attr("fill", (d) => hexToRgba(d.submitterColor, 0.06))
+      .attr("stroke", "rgba(38,38,36,0.1)")
+      .attr("stroke-width", 0.5)
       .attr("opacity", 0);
 
     // Card title
@@ -405,9 +405,9 @@ export default function KnowledgeGraph({
 
     svg.selectAll<SVGRectElement, MapNode>(".graph-card")
       .attr("stroke-width", (d) =>
-        d.id === selectedNodeId ? 2 : multiSelectIds.has(d.id) ? 2 : 1)
+        d.id === selectedNodeId ? 2 : multiSelectIds.has(d.id) ? 2 : 0.5)
       .attr("stroke", (d) =>
-        d.id === selectedNodeId ? "#262624" : multiSelectIds.has(d.id) ? "#D55E00" : hexToRgba(d.submitterColor, 0.2));
+        d.id === selectedNodeId ? "#262624" : multiSelectIds.has(d.id) ? "#D55E00" : "rgba(38,38,36,0.1)");
 
     // Multi-select lines
     const g = svg.select("g");
