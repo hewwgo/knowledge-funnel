@@ -202,37 +202,49 @@ export default function KnowledgeGraph({
         .text(c.label);
     }
 
-    // ── Layer 4: NN edges ──
+    // ── Layer 4: Connection edges (top-K nearest neighbors) ──
     const edgeGroup = g.append("g").attr("class", "nn-edges");
-    const clusterMembers = new Map<number, MapNode[]>();
-    for (const n of nodes) {
-      if (n.clusterId == null) continue;
-      if (!clusterMembers.has(n.clusterId)) clusterMembers.set(n.clusterId, []);
-      clusterMembers.get(n.clusterId)!.push(n);
-    }
-    const drawnEdges = new Set<string>();
-    for (const [, members] of clusterMembers) {
-      if (members.length < 2) continue;
-      for (const n of members) {
-        let nearest: MapNode | null = null;
-        let nearestDist = Infinity;
-        for (const o of members) {
-          if (o.id === n.id) continue;
-          const d = (n.x - o.x) ** 2 + (n.y - o.y) ** 2;
-          if (d < nearestDist) { nearestDist = d; nearest = o; }
-        }
-        if (!nearest) continue;
-        const key = [n.id, nearest.id].sort().join("-");
-        if (drawnEdges.has(key)) continue;
-        drawnEdges.add(key);
-        edgeGroup.append("line")
-          .attr("x1", xScale(n.x)).attr("y1", yScale(n.y))
-          .attr("x2", xScale(nearest.x)).attr("y2", yScale(nearest.y))
-          .attr("stroke", "rgba(38,38,36,0.06)")
-          .attr("stroke-width", 0.75)
-          .attr("class", "nn-edge")
-          .attr("opacity", 0);
+    const K_NEIGHBORS = 2; // connect each node to its 2 closest neighbors
+
+    // Precompute distances between all pairs
+    interface EdgeData { a: MapNode; b: MapNode; dist: number }
+    const allEdges: EdgeData[] = [];
+    for (let i = 0; i < nodes.length; i++) {
+      const dists: { node: MapNode; dist: number }[] = [];
+      for (let j = 0; j < nodes.length; j++) {
+        if (i === j) continue;
+        const dx = nodes[i].x - nodes[j].x;
+        const dy = nodes[i].y - nodes[j].y;
+        dists.push({ node: nodes[j], dist: Math.sqrt(dx * dx + dy * dy) });
       }
+      dists.sort((a, b) => a.dist - b.dist);
+      for (let k = 0; k < Math.min(K_NEIGHBORS, dists.length); k++) {
+        allEdges.push({ a: nodes[i], b: dists[k].node, dist: dists[k].dist });
+      }
+    }
+
+    // Deduplicate and draw
+    const maxDist = Math.max(...allEdges.map(e => e.dist), 1);
+    const drawnEdges = new Set<string>();
+    for (const edge of allEdges) {
+      const key = [edge.a.id, edge.b.id].sort().join("-");
+      if (drawnEdges.has(key)) continue;
+      drawnEdges.add(key);
+
+      // Thickness and opacity based on distance (closer = thicker)
+      const proximity = 1 - (edge.dist / maxDist);
+      const sameCluster = edge.a.clusterId != null && edge.a.clusterId === edge.b.clusterId;
+      const strokeW = sameCluster ? 0.5 + proximity * 2 : 0.3 + proximity * 1;
+      const strokeOpacity = sameCluster ? 0.08 + proximity * 0.15 : 0.03 + proximity * 0.08;
+
+      edgeGroup.append("line")
+        .attr("x1", xScale(edge.a.x)).attr("y1", yScale(edge.a.y))
+        .attr("x2", xScale(edge.b.x)).attr("y2", yScale(edge.b.y))
+        .attr("stroke", sameCluster ? "rgba(38,38,36,1)" : "rgba(38,38,36,1)")
+        .attr("stroke-width", strokeW)
+        .attr("stroke-opacity", strokeOpacity)
+        .attr("class", "nn-edge")
+        .attr("opacity", 0); // controlled by semantic zoom
     }
 
     // ── Layer 5: Nodes ──
@@ -315,9 +327,9 @@ export default function KnowledgeGraph({
         .attr("opacity", LEVEL_MID ? 0.8 : LEVEL_DETAIL ? 0.35 : 0)
         .attr("font-size", `${Math.max(10, Math.min(16, 13 / k))}px`);
 
-      // NN edges: visible at mid and detail
+      // Connection edges: visible at mid and detail, key visual element
       edgeGroup.selectAll(".nn-edge")
-        .attr("opacity", LEVEL_MID ? 0.08 : LEVEL_DETAIL ? 0.05 : 0);
+        .attr("opacity", LEVEL_OVERVIEW ? 0 : 1);
 
       // Nodes
       node.each(function (d) {
