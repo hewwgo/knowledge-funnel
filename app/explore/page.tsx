@@ -91,7 +91,7 @@ async function generateIdeas(
   const divergeSection = `=== SEEDS (starting points — go BEYOND these, not within them) ===
 ${seedDescriptions}
 
-These are springboards, not boundaries. The seeds represent what the researchers already know. Your job is to DIVERGE: generate directions that EXTEND, COMBINE, or REFRAME the seeds into territory the researchers haven't considered. Surprise them. Cross disciplinary lines. Propose unexpected intersections.`;
+These are springboards, not boundaries. The tiles represent what the researchers already know. Your job is to DIVERGE: generate directions that EXTEND, COMBINE, or REFRAME the tiles into territory the researchers haven't considered. Surprise them. Cross disciplinary lines. Propose unexpected intersections. You may also bring in adjacent concepts, methods, or fields NOT mentioned in the tiles if they create a compelling connection — be bold, go wider than the tiles when it serves the idea.`;
 
   const convergeSection = lockedFacets.length > 0
     ? `\n=== LOCKED DIMENSIONS (hard constraints — every idea MUST satisfy ALL) ===
