@@ -121,9 +121,9 @@ Vary your openings — some could start with a question ("What if..."), a provoc
 Each direction must be distinct from: ${JSON.stringify(existingTitles)}.
 
 Return a JSON array:
-{"title": "Short evocative concept name (2-5 words, not a paper title)", "description": "A direct, thought-provoking pitch. What's the core insight? What could be built or studied? Why would this matter? Be specific and bold.", "grounding": [{"seed": "exact seed title", "contribution": "one sentence on how this seed sparked this direction — not just 'provides context' but the specific leap taken"}]}
+{"title": "Short evocative concept name (2-5 words, not a paper title)", "description": "A direct, thought-provoking pitch. What's the core insight? What could be built or studied? Why would this matter? Be specific and bold.", "grounding": [{"seed": "exact seed title", "contribution": "How this tile connects: describe the specific concept, method, or finding borrowed and how it was reframed. NEVER start with 'The seed' — just state the connection directly, e.g. 'The focus on embodied interaction suggested applying...' or 'Borrowing the agent orchestration framework to...'"}]}
 
-Every idea needs a "grounding" array with 2-${Math.min(seeds.length, 4)} entries. Only reference seeds by exact title.`;
+Every idea needs a "grounding" array with 2-${Math.min(seeds.length, 4)} entries. Only reference tiles by exact title.`;
   const raw = await callLLM(sys, prompt);
   try {
     const jsonMatch = raw.match(/\[[\s\S]*\]/);
@@ -385,7 +385,7 @@ function SaveButton({ idea, lockedFacets }: { idea: Idea; lockedFacets: LockedFa
           color: "#fff",
         }}
       >
-        {saved ? "Saved to Map" : saving ? "Saving..." : "Save to Funnel"}
+        {saved ? "Saved to Map" : saving ? "Saving..." : "Save to Knowledge Map"}
       </button>
     </div>
   );
@@ -467,7 +467,7 @@ function IdeaDetail({ idea, facets, onClose, lockedFacets }: {
         );
       })}
 
-      {/* Save to Funnel */}
+      {/* Save to Knowledge Map */}
       <div style={{ marginTop: 24, paddingTop: 16, borderTop: "1px solid rgba(212, 165, 116, 0.3)" }}>
         <button
           onClick={handleSave}
@@ -482,7 +482,7 @@ function IdeaDetail({ idea, facets, onClose, lockedFacets }: {
             color: "#fff",
           }}
         >
-          {saved ? "✓ Saved to Knowledge Map" : saving ? "Saving..." : "Save to Funnel"}
+          {saved ? "✓ Saved to Knowledge Map" : saving ? "Saving..." : "Save to Knowledge Map"}
         </button>
         {saved && (
           <p style={{ fontSize: 10, color: "rgba(38,38,36,0.4)", marginTop: 6, textAlign: "center" }}>
@@ -982,7 +982,7 @@ function ExploreInner() {
                       ))}
                     </div>
 
-                    {/* Save to Funnel */}
+                    {/* Save to Knowledge Map */}
                     <SaveButton idea={selectedIdea} lockedFacets={lockedFacets} />
                   </div>
                 )}
