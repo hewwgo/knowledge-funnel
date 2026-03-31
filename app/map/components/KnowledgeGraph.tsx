@@ -382,7 +382,7 @@ export default function KnowledgeGraph({
             `<div style="margin-bottom:4px"><strong>${cleanTitle(d.title)}</strong></div>` +
             `<div style="color:rgba(255,255,255,0.6);font-size:11px;margin-bottom:3px">${d.contentType} · ${d.submitterName}</div>` +
             (d.concepts.length > 0 ? `<div style="color:rgba(255,255,255,0.4);font-size:10px">${d.concepts.join(" · ")}</div>` : "") +
-            `<div style="color:rgba(255,255,255,0.3);font-size:9px;margin-top:4px">Click · Shift+click to select</div>`
+            `<div style="color:rgba(255,255,255,0.3);font-size:9px;margin-top:4px">Click · Shift+click to add tile</div>`
           );
       })
       .on("mousemove", (event) => {

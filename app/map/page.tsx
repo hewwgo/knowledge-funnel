@@ -323,7 +323,7 @@ export default function MapPage() {
           )}
           {multiSelectIds.size > 0 && (
             <div className="map-selection-bar">
-              <span>{multiSelectIds.size} selected</span>
+              <span>{multiSelectIds.size} tiles selected</span>
               <button className="map-selection-explore" onClick={handleExploreSelected}>
                 Compose
               </button>

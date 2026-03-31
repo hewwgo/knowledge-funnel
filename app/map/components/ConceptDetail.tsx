@@ -146,7 +146,7 @@ export default function ConceptDetail({
         {multiSelectedNodes.length > 0 && (
           <div className="map-detail-neighbors" style={{ marginTop: 20 }}>
             <h4 className="map-detail-section-title">
-              Selected for Exploration ({multiSelectedNodes.length})
+              Selected Tiles ({multiSelectedNodes.length})
             </h4>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {multiSelectedNodes.map((n) => {

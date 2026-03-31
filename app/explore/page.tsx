@@ -227,7 +227,7 @@ function Chip({ type, label, onRemove, locked }: {
 }) {
   return (
     <span className="explore-chip" data-locked={locked ? "true" : undefined} data-type={type === "Seed" ? "seed" : "facet"}>
-      <span className="explore-chip-type">{type}</span>
+      <span className="explore-chip-type">{type === "Seed" ? "TILE" : type}</span>
       <span style={{ color: "rgba(38,38,36,0.3)" }}>:</span> {label}
       {onRemove && (
         <button onClick={onRemove} className="explore-chip-remove">&times;</button>
@@ -790,7 +790,7 @@ function ExploreInner() {
   if (!seedsLoaded) {
     return (
       <div className="map-page">
-        <div className="map-empty">Loading seeds...</div>
+        <div className="map-empty">Loading tiles...</div>
       </div>
     );
   }
@@ -817,7 +817,7 @@ function ExploreInner() {
           onClick={() => setSeedsExpanded(!seedsExpanded)}
           style={{ fontSize: 10 }}
         >
-          Seeds ({seeds.length})
+          Tiles ({seeds.length})
           {lockedFacets.length > 0 && <span style={{ color: "#009E73", marginLeft: 4 }}>+{lockedFacets.length}</span>}
           <span style={{ marginLeft: 3, fontSize: 8 }}>{seedsExpanded ? "▴" : "▾"}</span>
         </button>
@@ -858,34 +858,27 @@ function ExploreInner() {
         )}
       </div>
 
-      {/* Seeds expandable panel — below toolbar */}
-      {seedsExpanded && (
-        <div style={{
-          position: "absolute", top: 52, left: "50%", transform: "translateX(-50%)",
-          zIndex: 19, background: "rgba(255,255,255,0.96)", backdropFilter: "blur(12px)",
-          border: "1px solid rgba(38,38,36,0.1)", boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
-          padding: "8px 14px", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap",
-          maxWidth: "80vw",
-        }}>
-          {seeds.map((s, i) => (
-            <Chip key={`s-${i}`} type={s.type} label={s.label.length > 35 ? s.label.slice(0, 33) + "…" : s.label} onRemove={() => handleRemoveSeed(i)} />
-          ))}
-          {lockedFacets.map((f, i) => (
-            <Chip key={`l-${i}`} type={f.name} label={f.selectedValues.join(", ")} locked onRemove={() => handleRemoveLocked(i)} />
-          ))}
-          <input
-            value={newSeed}
-            onChange={(e) => setNewSeed(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleAddSeed()}
-            placeholder="Add seed..."
-            className="explore-seed-input"
-          />
-        </div>
-      )}
-
       {/* Main content area */}
       <div style={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 56 }}>
         <div style={{ width: "100%", maxWidth: 1100, padding: "12px 24px" }}>
+
+          {/* Tiles expandable panel — pushes content down */}
+          {seedsExpanded && (seeds.length > 0 || lockedFacets.length > 0) && (
+            <div style={{
+              position: "relative",
+              background: "rgba(255,255,255,0.96)", backdropFilter: "blur(12px)",
+              border: "1px solid rgba(38,38,36,0.1)", boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
+              padding: "8px 14px", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap",
+              width: "100%", marginBottom: 8,
+            }}>
+              {seeds.map((s, i) => (
+                <Chip key={`s-${i}`} type={s.type} label={s.label.length > 35 ? s.label.slice(0, 33) + "…" : s.label} onRemove={() => handleRemoveSeed(i)} />
+              ))}
+              {lockedFacets.map((f, i) => (
+                <Chip key={`l-${i}`} type={f.name} label={f.selectedValues.join(", ")} locked onRemove={() => handleRemoveLocked(i)} />
+              ))}
+            </div>
+          )}
 
           {/* Facet columns */}
           {facets.length === 0 && ideas.length === 0 && !generating && (
