@@ -70,7 +70,7 @@ async function callLLM(systemPrompt: string, userPrompt: string): Promise<string
 
 function buildConstraintString(seeds: Seed[], lockedFacets: LockedFacet[]): string {
   const parts = seeds.map((s) => {
-    const bodySnippet = s.body ? ` — ${s.body.slice(0, 300)}` : "";
+    const bodySnippet = s.body ? ` — ${s.body.slice(0, 2000)}` : "";
     return `${s.type}: ${s.label}${bodySnippet}`;
   });
   lockedFacets.forEach((f) => {
@@ -83,7 +83,7 @@ async function generateIdeas(
   seeds: Seed[], lockedFacets: LockedFacet[], existingTitles: string[], count: number
 ): Promise<{ title: string; description: string; grounding: Grounding[] }[]> {
   const seedDescriptions = seeds.map((s) => {
-    const bodySnippet = s.body ? ` — ${s.body.slice(0, 300)}` : "";
+    const bodySnippet = s.body ? ` — ${s.body.slice(0, 2000)}` : "";
     return `"${s.label}"${bodySnippet}`;
   }).join("\n");
 
