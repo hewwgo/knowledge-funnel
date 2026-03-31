@@ -104,10 +104,12 @@ These are non-negotiable. Every generated idea must satisfy every constraint. Bu
 
 CRITICAL RULES for descriptions:
 - NEVER start with "A promising direction..." or any formulaic opening. Every description must start differently.
-- Write as if pitching to the researchers directly. They are experts — don't explain basics.
-- Each direction should make a researcher think "I hadn't considered that angle."
-- Be concrete about what could be built, studied, or tested — not abstract hand-waving.
-- Frame as open questions and possibilities, not finished projects.
+- NEVER use em-dashes. Use commas, periods, or semicolons instead.
+- Write as if talking to the researchers directly. They are experts, don't explain basics.
+- Be INQUISITIVE, not declarative. You don't need to form the perfect idea. Instead, surface interesting connections between the works and pose directions for how they could come together.
+- Ask questions the researchers haven't asked themselves. "What happens when X meets Y?" "Could the method from A reveal something unexpected about B?"
+- Be concrete enough to be actionable, but leave room for the researchers to shape it.
+- Frame as open threads worth pulling, not finished proposals.
 
 Respond ONLY with a JSON array. No markdown, no backticks, no preamble. Start with [ and end with ].`;
 
