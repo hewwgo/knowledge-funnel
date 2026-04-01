@@ -25,7 +25,7 @@ export async function POST(request: Request) {
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
-      temperature: 0.85,
+      temperature: 1.0,
       max_tokens: 3000,
     });
 
