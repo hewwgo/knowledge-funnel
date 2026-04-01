@@ -87,45 +87,40 @@ async function generateIdeas(
     return `"${s.label}"${bodySnippet}`;
   }).join("\n");
 
-  // Build explicit diverge/converge sections
-  const divergeSection = `=== SEEDS (starting points — go BEYOND these, not within them) ===
+  // Build tile context
+  const divergeSection = `=== TILES (research contributions from the group) ===
 ${seedDescriptions}
 
-These are springboards, not boundaries. The tiles represent what the researchers already know. Your job is to DIVERGE: generate directions that EXTEND, COMBINE, or REFRAME the tiles into territory the researchers haven't considered. Surprise them. Cross disciplinary lines. Propose unexpected intersections. You may also bring in adjacent concepts, methods, or fields NOT mentioned in the tiles if they create a compelling connection — be bold, go wider than the tiles when it serves the idea.`;
+These tiles come from different researchers in a collaborative group. They represent different perspectives, methods, and interests. Use them as creative raw material.`;
 
   const convergeSection = lockedFacets.length > 0
-    ? `\n=== LOCKED DIMENSIONS (hard constraints — every idea MUST satisfy ALL) ===
-${lockedFacets.map((f) => `${f.name}: MUST be one of [${f.selectedValues.join(", ")}]. Do NOT generate ideas outside these values.`).join("\n")}
-
-These are non-negotiable. Every generated idea must satisfy every constraint. But within these constraints, still push for novelty and surprise.`
+    ? `\n=== LOCKED DIMENSIONS (constraints) ===
+${lockedFacets.map((f) => `${f.name}: must be one of [${f.selectedValues.join(", ")}]`).join("\n")}`
     : "";
 
-  const sys = `You are a creative research provocateur for HCI and related fields. You take researchers' existing work as seeds and generate bold, unexpected research directions that go BEYOND what the researchers have already thought about. You are not summarizing their work — you are opening new doors from it.
+  const sys = `You are a thoughtful research advisor helping a group of HCI researchers find interesting connections in their collective work. You read their submissions and suggest research directions that naturally emerge from combining their perspectives.
 
-CRITICAL RULES for descriptions:
-- NEVER start with "A promising direction..." or any formulaic opening. Every description must start differently.
-- NEVER use em-dashes. Use commas, periods, or semicolons instead.
-- Write as if talking to the researchers directly. They are experts, don't explain basics.
-- Be INQUISITIVE, not declarative. You don't need to form the perfect idea. Instead, surface interesting connections between the works and pose directions for how they could come together.
-- Ask questions the researchers haven't asked themselves. "What happens when X meets Y?" "Could the method from A reveal something unexpected about B?"
-- Be concrete enough to be actionable, but leave room for the researchers to shape it.
-- Frame as open threads worth pulling, not finished proposals.
+RULES:
+- Write clearly and directly. No em-dashes. No jargon for jargon's sake.
+- Each idea should feel PLAUSIBLE, like something a researcher would actually want to pursue.
+- Not every idea needs to bridge all tiles. Some ideas might primarily build on one tile with a twist from another. Some might genuinely connect two or three. Let the connection be natural, not forced.
+- Be specific: name concrete methods, study designs, or system features. Vague ideas are useless.
+- Mix types: some ideas should be systems to build, some should be studies to run, some should be conceptual frameworks, some should be design explorations.
+- Vary your tone: some descriptions can be a question, some a proposal, some an observation about a gap.
 
-Respond ONLY with a JSON array. No markdown, no backticks, no preamble. Start with [ and end with ].`;
+Respond ONLY with a JSON array. No markdown, no backticks. Start with [ and end with ].`;
 
   const prompt = `${divergeSection}
 ${convergeSection}
 
-Generate exactly ${count} research directions. Each should open a genuinely new angle that the seed researchers likely haven't explored.
-
-Vary your openings — some could start with a question ("What if..."), a provocation ("Most systems assume X, but..."), a scenario ("Imagine a researcher who..."), or a concrete proposal ("Build a system that..."). NEVER repeat the same opening pattern.
+Generate exactly ${count} research directions inspired by these tiles. Each should feel like something a smart colleague might suggest after reading the group's work.
 
 Each direction must be distinct from: ${JSON.stringify(existingTitles)}.
 
 Return a JSON array:
-{"title": "Short evocative concept name (2-5 words, not a paper title)", "description": "A direct, thought-provoking pitch. What's the core insight? What could be built or studied? Why would this matter? Be specific and bold.", "grounding": [{"seed": "exact seed title", "contribution": "How this tile connects: describe the specific concept, method, or finding borrowed and how it was reframed. NEVER start with 'The seed' — just state the connection directly, e.g. 'The focus on embodied interaction suggested applying...' or 'Borrowing the agent orchestration framework to...'"}]}
+{"title": "Concise concept name (2-6 words)", "description": "2-4 sentences. What is the idea? Why is it interesting? What would you actually do? Be concrete and specific.", "grounding": [{"seed": "exact tile title", "contribution": "One sentence: what specific concept or finding from this tile inspired this direction, and how it was extended or reframed."}]}
 
-Every idea needs a "grounding" array with 2-${Math.min(seeds.length, 4)} entries. Only reference tiles by exact title.`;
+Each idea needs 1-${Math.min(seeds.length, 3)} grounding entries. Use 1 if the idea primarily comes from one tile. Use 2-3 only if the connection is genuine. Do not force bridges that don't exist. Reference tiles by exact title.`;
   const raw = await callLLM(sys, prompt);
   try {
     const jsonMatch = raw.match(/\[[\s\S]*\]/);
