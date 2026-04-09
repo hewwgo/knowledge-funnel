@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { anonymize } from "@/lib/anonymize";
 
 // Colorblind-safe palette (Okabe-Ito)
 const RESEARCHER_COLORS = [
@@ -81,7 +82,7 @@ export async function GET() {
       if (!researcherMap.has(profile.id)) {
         researcherMap.set(profile.id, {
           id: profile.id,
-          name: profile.name,
+          name: anonymize(profile.name),
           color: RESEARCHER_COLORS[colorIndex % RESEARCHER_COLORS.length],
           submissionCount: 0,
         });
@@ -99,7 +100,7 @@ export async function GET() {
         y: p.y as number,
         clusterId: p.cluster_id as number | null,
         submitterId: profile.id,
-        submitterName: profile.name,
+        submitterName: anonymize(profile.name),
         submitterColor: researcher.color,
         concepts: conceptsBySubmission.get(sub.id) || [],
         distinctiveConcepts: (conceptsBySubmission.get(sub.id) || [])

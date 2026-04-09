@@ -882,7 +882,7 @@ function ExploreInner() {
             <div className="explore-empty">
               {seeds.length === 0
                 ? <>Select submissions from the <a href="/map" style={{ color: "#262624", fontWeight: 600 }}>knowledge map</a> to begin.</>
-                : <>Press <strong>Generate</strong> to explore the idea space.</>
+                : <>Press <strong> Generate </strong> to explore the idea space.</>
               }
             </div>
           )}

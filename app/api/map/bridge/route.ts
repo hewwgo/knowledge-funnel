@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { anonymize } from "@/lib/anonymize";
 import OpenAI from "openai";
 
 const deepseek = new OpenAI({
@@ -42,7 +43,7 @@ export async function POST(req: Request) {
       };
       const profile = sub.profiles;
       if (!byResearcher.has(profile.id)) {
-        byResearcher.set(profile.id, { name: profile.name, submissions: [] });
+        byResearcher.set(profile.id, { name: anonymize(profile.name), submissions: [] });
       }
       byResearcher.get(profile.id)!.submissions.push({
         title: sub.title || "(untitled)",
@@ -69,7 +70,7 @@ export async function POST(req: Request) {
       const sub = p.submissions as unknown as {
         title: string; body: string; profiles: { name: string };
       };
-      return `[${sub.profiles.name}] "${sub.title}": ${(sub.body || "").slice(0, 200)}`;
+      return `[${anonymize(sub.profiles.name)}] "${sub.title}": ${(sub.body || "").slice(0, 200)}`;
     });
 
     const response = await deepseek.chat.completions.create({

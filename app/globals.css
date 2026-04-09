@@ -698,8 +698,8 @@ body {
   z-index: 20;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px 14px;
+  gap: 14px;
+  padding: 10px 20px;
   background: rgba(255, 255, 255, 0.94);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(38, 38, 36, 0.1);
@@ -715,14 +715,14 @@ body {
 }
 
 .map-toolbar-brand {
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 700;
   color: #262624;
   letter-spacing: 0.02em;
 }
 
 .map-toolbar-stats {
-  font-size: 9px;
+  font-size: 11px;
   color: rgba(38, 38, 36, 0.4);
 }
 
@@ -737,10 +737,10 @@ body {
 }
 
 .map-toolbar-search input {
-  width: 180px;
-  padding: 4px 22px 4px 8px;
+  width: 200px;
+  padding: 6px 24px 6px 10px;
   border: 1px solid rgba(38, 38, 36, 0.15);
-  font-size: 11px;
+  font-size: 13px;
   font-family: "Inter", sans-serif;
   color: #262624;
   background: transparent;
@@ -768,10 +768,10 @@ body {
 }
 
 .map-toolbar-dropdown-btn {
-  padding: 5px 10px;
+  padding: 7px 14px;
   border: 1px solid rgba(38, 38, 36, 0.15);
   background: rgba(38, 38, 36, 0.02);
-  font-size: 11px;
+  font-size: 13px;
   font-family: "Inter", sans-serif;
   color: #262624;
   cursor: pointer;
@@ -800,10 +800,10 @@ body {
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 6px 12px;
+  padding: 8px 14px;
   border: none;
   background: none;
-  font-size: 11px;
+  font-size: 13px;
   font-family: "Inter", sans-serif;
   color: #262624;
   cursor: pointer;

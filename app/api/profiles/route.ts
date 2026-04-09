@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { anonymize } from "@/lib/anonymize";
 
 export async function GET() {
   const supabase = getSupabaseAdmin();
@@ -12,5 +13,9 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json(data);
+  const anonymized = (data || []).map((p: { id: string; name: string }) => ({
+    ...p,
+    name: anonymize(p.name),
+  }));
+  return NextResponse.json(anonymized);
 }
