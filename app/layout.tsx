@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Twin Agent Incubator",
+  title: "Tessera",
   description: "Knowledge Funnel — Drop research items for your twin agent",
 };
 
