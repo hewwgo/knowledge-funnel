@@ -310,6 +310,17 @@ function enterRating() {
   showItem();
   flushQueue();
 }
+// Answers are model markdown; chat apps show it rendered, so raters should too
+function renderMd(t) {
+  const esc = t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return esc.split("\n").map(line => {
+    if (/^\s*([-*_])\1{2,}\s*$/.test(line)) return "<hr>";
+    const h = line.match(/^\s*#{1,6}\s+(.*)$/);
+    let s = h ? "<b>" + h[1].replace(/\*\*/g, "") + "</b>" : line.replace(/^(\s*)[*-]\s+/, "$1\u2022 ");
+    s = s.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/(^|[\s(])\*([^*\s][^*]*?)\*/g, "$1<i>$2</i>");
+    return s;
+  }).join("\n");
+}
 function partSizes() { return ASSIGNMENT.part_sizes[String(slot)]; }
 function partOf(p) {
   let left = p;
@@ -326,7 +337,7 @@ function showItem() {
   $("panes").innerHTML = "";
   for (const [lab, t] of [["ANSWER A", it.a], ["ANSWER B", it.b]]) {
     const d = document.createElement("div"); d.className = "pane";
-    d.innerHTML = "<h4>" + lab + "</h4>"; d.appendChild(document.createTextNode(t)); $("panes").appendChild(d);
+    d.innerHTML = "<h4>" + lab + "</h4><div>" + renderMd(t) + "</div>"; $("panes").appendChild(d);
   }
   optionButtons($("opts"), v => { if (picked && picked !== v) changes += 1; picked = v; $("confirm").disabled = false; });
   const [part, within, size] = partOf(pos);
