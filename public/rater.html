@@ -199,8 +199,12 @@ function fail(msg) { $("err-msg").textContent = msg; show("s-error"); }
 
 /* ---------- storage ---------- */
 const LS = () => "rater-" + STUDY + "-" + raterId;
-function loadLocal() { try { return JSON.parse(localStorage.getItem(LS()) || "{}"); } catch (e) { return {}; } }
-function saveLocal(st) { try { localStorage.setItem(LS(), JSON.stringify(st)); } catch (e) {} }
+let memState = {};   /* browsers can block localStorage; answers must still reach the server */
+function loadLocal() {
+  try { const s = localStorage.getItem(LS()); return s ? JSON.parse(s) : memState; }
+  catch (e) { return memState; }
+}
+function saveLocal(st) { memState = st; try { localStorage.setItem(LS(), JSON.stringify(st)); } catch (e) {} }
 
 /* ---------- server ---------- */
 const H = { "apikey": CONFIG.key, "Authorization": "Bearer " + CONFIG.key,
@@ -212,7 +216,8 @@ async function rpcClaimSlot() {
   return Number(await r.text());
 }
 async function postRow(table, row) {
-  const r = await fetch(CONFIG.url + "/rest/v1/" + table, { method: "POST", headers: H, body: JSON.stringify(row) });
+  const signal = AbortSignal.timeout ? AbortSignal.timeout(15000) : undefined;
+  const r = await fetch(CONFIG.url + "/rest/v1/" + table, { method: "POST", headers: H, body: JSON.stringify(row), signal });
   if (r.ok || r.status === 409) return true;   // 409: duplicate = already stored
   throw new Error(table + " " + r.status);
 }
@@ -221,17 +226,24 @@ function logEvent(event, payload) {
                             event, payload: payload || null }).catch(() => {});
 }
 /* queue of judgments not yet confirmed by the server */
-async function flushQueue() {
-  const st = loadLocal();
-  const q = st.queue || [];
-  const left = [];
-  for (const row of q) {
-    try { await postRow("rater_judgments", row); st.saved = st.saved || {}; st.saved[row.item_id] = 1; }
-    catch (e) { left.push(row); }
+let flushing = Promise.resolve(0);
+function flushQueue() {
+  flushing = flushing.then(flushOnce, flushOnce);   /* one at a time: overlaps can overwrite the queue */
+  return flushing;
+}
+async function flushOnce() {
+  for (const row of (loadLocal().queue || []).slice()) {
+    try {
+      await postRow("rater_judgments", row);
+      const st = loadLocal();
+      st.saved = st.saved || {}; st.saved[row.item_id] = 1;
+      st.queue = (st.queue || []).filter(r => r.item_id !== row.item_id);
+      saveLocal(st);
+    } catch (e) {}
   }
-  st.queue = left; saveLocal(st);
-  $("net").textContent = left.length ? (left.length + " answer(s) waiting to save, retrying...") : "";
-  return left.length;
+  const left = (loadLocal().queue || []).length;
+  $("net").textContent = left ? (left + " answer(s) waiting to save, retrying...") : "";
+  return left;
 }
 
 /* ---------- consent ---------- */
