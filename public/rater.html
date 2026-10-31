@@ -67,7 +67,7 @@
     <li>About <b>60 minutes</b> for about <b>31 pairs</b>, split into three parts with a pause between them. Your progress is saved after every answer.</li>
     <li>Please use a <b>desktop or laptop</b> with a wide browser window so both texts fit side by side.</li>
     <li>The study starts with a short instruction page and three practice questions that check you have understood the task.</li>
-    <li>We store your judgments, the time you take per item, and your Prolific ID. We do not collect any other personal data. The judgments are used in academic research and may be published in anonymized form.</li>
+    <li>We store your judgments, the time you take per item, your progress through the study (including practice attempts), and your Prolific ID and session ID. We do not collect any other personal data. The judgments are used in academic research and may be published in anonymized form.</li>
     <li>Participation is voluntary. You can stop at any time by returning the submission on Prolific.</li>
     <li>Questions: <span id="contact">the researcher via Prolific messages</span></li>
   </ul>
@@ -238,7 +238,7 @@ async function flushQueue() {
 $("consent-box").onchange = () => $("consent-go").disabled = !$("consent-box").checked;
 $("consent-go").onclick = async () => {
   if (!raterId) { $("consent-err").textContent = "No Prolific ID found in the link. Please open the study from Prolific."; return; }
-  logEvent("consent", { ua: navigator.userAgent, w: innerWidth, h: innerHeight });
+  logEvent("consent");
   const st = loadLocal();
   gateFails = st.gateFails || 0;
   if (gateFails >= 2) { show("s-gatefail"); return; }
@@ -356,8 +356,7 @@ $("confirm").onclick = async () => {
   $("confirm").disabled = true;
   const it = itemById[sequence[pos]];
   const row = { study: STUDY, rater_id: raterId, slot, session_id: sessionId, item_id: it.id,
-                position: pos, rating: picked, rt_ms: Date.now() - shownAt, changed: changes,
-                user_agent: navigator.userAgent.slice(0, 200) };
+                position: pos, rating: picked, rt_ms: Date.now() - shownAt, changed: changes };
   const st = loadLocal(); st.queue = st.queue || []; st.queue.push(row); saveLocal(st);
   flushQueue().then(() => { const s = $("saved"); s.style.visibility = "visible"; setTimeout(() => s.style.visibility = "hidden", 600); });
   pos += 1;
